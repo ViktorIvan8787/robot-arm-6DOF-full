@@ -3,6 +3,7 @@
 #include "robot_arm/robot.hpp"
 #include "simulation_assets/simulation_state.hpp"
 #include "simulation_assets/rendering.hpp"
+#include "simulation_assets/hud.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -11,20 +12,24 @@
 #include <raymath.h>
 #include <vector>
 #include <iostream>
+#include <string>
 
 namespace {
 
-constexpr int kWindowWidth = 1000;
-constexpr int kWindowHeight = 700;
+constexpr int kWindowWidth = 1600;
+constexpr int kWindowHeight = 1050;
 constexpr int kTargetFramesPerSecond = 60;
 
-constexpr float kCameraMovementSpeed = 3.0f;
-constexpr float kCameraMouseSensitivity = 0.7;
-constexpr float kCameraZoomSpeed = 2.0f;
-constexpr float kTargetMovementSpeed = 0.6f;
+constexpr float kCameraMovementSpeed = 2.0f;
+constexpr float kCameraMouseSensitivity = 0.5;
+constexpr float kCameraZoomSpeed = 0.4f;
+constexpr float kTargetExclusionRadius = 0.15f;
+constexpr float kMaxTargetHeight = 0.38;
+constexpr float kMinTargetHeight = 0.0f; 
+constexpr float kTargetMovementSpeed = 0.3f;
 constexpr float kOrientationStep = 45.0f * DEG2RAD;
 constexpr float kManualJointSpeed = 60.0f * DEG2RAD;
-constexpr float kPathRadius = 0.67f;
+constexpr float kPathRadius = 0.5f;
 constexpr float kWaypointTolerance = 0.02f;
 constexpr float kReachSafetyFactor = 0.85f;
 
@@ -44,7 +49,7 @@ void initialiseSimulation(SimulationState& state)
 {
     // Setting up 3D camera
     // Where camera is in space
-    state.camera.position = {1.0f, 1.0f, 1.0f};
+    state.camera.position = {1.0f, 2.0f, 0.0f};
     // Point camera is looking at
     state.camera.target = {0.0f, 0.5f, 0.0f};
     // For the camera, y axis is upwards
@@ -53,6 +58,8 @@ void initialiseSimulation(SimulationState& state)
     state.camera.fovy = 50.0f;
     state.camera.projection = CAMERA_PERSPECTIVE;
     state.maximumApproximateReach = estimateMaximumReach(state.model);
+    std::string fontPath = std::string(GetApplicationDirectory()) + "assets/fonts/Quicksand-Bold.ttf";
+    state.hudFont = LoadFont(fontPath.c_str());
 }
 
 void updateViewCamera(Camera3D& camera, float deltaTime)
@@ -85,7 +92,7 @@ void updateViewCamera(Camera3D& camera, float deltaTime)
         &camera,
         translation,
         {rotation.x, rotation.y, 0.0f},
-        GetMouseWheelMove() * kCameraZoomSpeed);
+        -GetMouseWheelMove() * kCameraZoomSpeed);
 }
 
 void selectJointFromKeyboard(SimulationState& state)
@@ -127,6 +134,68 @@ void updateTargetOrientationFromKeyboard(SimulationState& state)
 
     if (IsKeyPressed(KEY_APOSTROPHE)) state.targetOrientation = MatrixMultiply(state.targetOrientation, MatrixRotateZ(kOrientationStep));
     if (IsKeyPressed(KEY_BACKSLASH)) state.targetOrientation = MatrixMultiply(state.targetOrientation, MatrixRotateZ(-kOrientationStep));
+}
+
+// Bounds the targetPostition to a confined space.
+// Prevents going into negative axis, above a singularity threshold,
+// and too close to robot arm centre axis
+Vector3 boundTargetPosition(
+    Vector3 target,
+    float exclusionRadius,
+    float minHeight,
+    float maxHeight)
+{
+    // Cylinder push - prevents target from central cylinder
+    Vector3 horizontal {target.x, target.y, 0.0f};
+    const float horizontalDistance = Vector3Length(horizontal);
+
+    if (horizontalDistance <= exclusionRadius) {
+        if (horizontalDistance < 0.001f) {
+            // Target is on central axis, push it out randomly
+            target.x = exclusionRadius;
+        } else {
+                // target is only limited to centre cylinder radius.
+            Vector3 pushedHorizontal = Vector3Scale(horizontal, exclusionRadius / horizontalDistance);
+            target.x = pushedHorizontal.x;
+            target.y = pushedHorizontal.y;
+        }
+    }
+
+    // Height limit (minHeight and maxHeight)
+    target.z = std::clamp(target.z, minHeight, maxHeight);
+
+    return target;
+}
+
+// Function for finding nearest 360 deg for when returning to homeAngles
+float fullCircleAngle(float from, float to)
+{
+    // fmod finds the remainder angle from 360 deg
+    float difference = std::fmod(to - from, 2.0f * PI);
+    if (difference > PI) {
+        difference -= 2.0f * PI;
+    } else if (difference < -PI) {
+        difference += 2.0f * PI;
+    }
+    return difference;
+}
+
+void returnToHomeAngles(SimulationState& state, float deltaTime) 
+{
+    constexpr float kReturnSpeed = 1.8f; // rad/s
+    const float maxStep = kReturnSpeed * deltaTime;
+
+    for (std::size_t joint = 0; joint < robot_arm::kJointCount; ++joint) {
+        const float target = state.model.homeAngles[joint];
+        const float current = state.angles[joint];
+        const float difference = fullCircleAngle(current, target);
+
+        if (std::fabs(difference) <= maxStep) {
+            state.angles[joint] = target;
+        } else {
+            state.angles[joint] += (difference > 0.0f ? maxStep : -maxStep);
+        }
+    }
 }
 
 void updateManualJointControl(SimulationState& state, float deltaTime)
@@ -191,10 +260,24 @@ void handleInput(SimulationState& state, float deltaTime)
         state.enforceJointLimits = !state.enforceJointLimits;
     }
 
+    // ========= HOME ANGLES TOGGLE ===============
+    if (IsKeyPressed(KEY_H)) {
+        state.returningHome = !state.returningHome;
+        if (state.returningHome) {
+            state.targetMode = false;
+        }
+    }
+
+    // ======== ROBOT RENDER ===========
+    if (IsKeyPressed(KEY_T)) {
+        state.toggleRobotDesign = !state.toggleRobotDesign;
+    }
+
     updatePathwaySelection(state);
     updateTargetFromKeyboard(state, deltaTime);
     updateTargetOrientationFromKeyboard(state);
     updateManualJointControl(state, deltaTime);
+    updateHudInput(state);
 }
 
 void updateRobot(SimulationState& state)
@@ -208,10 +291,12 @@ void updateRobot(SimulationState& state)
         state.targetPosition = state.pathwayPoints[state.currentWaypoint];
     }
 
-    // Create a fixed position for when the coordinates are out of reach.
+    // Bound the target position (hieght, centre radius)
+    // to avoid singularities,collisions, and oscillations
+    state.targetPosition = boundTargetPosition(
+        state.targetPosition, kTargetExclusionRadius, kMinTargetHeight, kMaxTargetHeight);
+
     Vector3 reachableTarget = state.targetPosition;
-    // If the coordinate is larger than the approximate maximum arm reach, it
-    // is normalised and scaled so calculations continue at a reachable point.
     if (Vector3Length(reachableTarget) > state.maximumApproximateReach) {
         reachableTarget = Vector3Scale(
             Vector3Normalize(reachableTarget), state.maximumApproximateReach);
@@ -234,6 +319,13 @@ void updateRobot(SimulationState& state)
         !state.pathwayPoints.empty()) {
         state.currentWaypoint =
             (state.currentWaypoint + 1) % state.pathwayPoints.size();
+    }
+
+    if (state.returningHome) {
+        returnToHomeAngles(state, GetFrameTime());
+        if (robot_arm::isAtHomeAngles(state.angles, state.model.homeAngles, 0.01f)) {
+            state.returningHome = false;
+        }
     }
 }
 
@@ -260,13 +352,21 @@ int main()
         robot_arm::JointPositions positions {};
         robot_arm::JointTransforms transforms {};
         robot_arm::forwardKinematics(state.angles, state.model, positions, transforms);
+        state.endEffectorPosition = positions.back();
+        state.endEffectorVelocity = Vector3Scale(
+            Vector3Subtract(state.endEffectorPosition, state.previousEndEffectorPosition), 
+            1.0f / deltaTime);
+        state.previousEndEffectorPosition = state.endEffectorPosition;
 
         BeginDrawing();
-        ClearBackground(RAYWHITE);
+        ClearBackground(Color{135, 206, 250, 255}); // light sky blue
         drawRobot(state, positions, transforms);
-        drawInterface(state);
+        drawHudPanel(state);
+        drawStatsPanel(state);
         EndDrawing();
     }
+
+    UnloadFont(state.hudFont);
 
     CloseWindow();
     return 0;

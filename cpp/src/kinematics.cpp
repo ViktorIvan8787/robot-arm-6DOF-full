@@ -74,7 +74,7 @@ float determinantNxN(float matrix[N][N])
 template float determinantNxN<3>(float matrix[3][3]); // <- NOT currently used
 template float determinantNxN<6>(float matrix[6][6]);
 
-// ============ SOLVING 3x3/6x6 LINEAR SYSTEM ============
+// ============ SOLVING LINEAR SYSTEM ============
 
 // For arm orientation
 // Solves a general N x N linear system A*x = b using Gaussian elimination

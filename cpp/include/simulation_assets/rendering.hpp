@@ -8,5 +8,3 @@ void drawRobot(
     const robot_arm::JointPositions& positions,
     const robot_arm::JointTransforms& transforms
 );
-
-void drawInterface(const SimulationState& state);

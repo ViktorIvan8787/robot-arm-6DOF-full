@@ -19,6 +19,7 @@ add_library(robot_arm_core
     src/kinematics.cpp
     src/pathways.cpp
     src/rendering.cpp
+    src/hud.cpp
 )
 
 target_include_directories(robot_arm_core
@@ -31,6 +32,12 @@ target_link_libraries(robot_arm_core PUBLIC raylib)
 
 add_executable(robot_arm_simulator
     apps/simulation.cpp
+)
+
+add_custom_command(TARGET robot_arm_simulator POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets
+        $<TARGET_FILE_DIR:robot_arm_simulator>/assets
 )
 
 target_link_libraries(robot_arm_simulator PRIVATE robot_arm_core)

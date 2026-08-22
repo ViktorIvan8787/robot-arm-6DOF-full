@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstddef>
+#include <limits>
 
 namespace robot_arm {
 
@@ -33,6 +34,7 @@ inline RobotModel createDefaultRobotModel()
     constexpr float pi = 3.14159265358979323846f;
     // DEG2RAD is a built in RayLib variable, but this file doesn't include RayLib lib 
     constexpr float DEG2RAD = pi / 180.0f;
+    constexpr float kInfinity = std::numeric_limits<float>::infinity();
 
     return {
         // Geometry for all 6 joints (a, alpha, d) First joint is the base,
@@ -46,10 +48,10 @@ inline RobotModel createDefaultRobotModel()
         {{
             // {a, alpha, d, theta_offset}
             {0.00f, 90.0f * DEG2RAD, 0.22f, 0.0f * DEG2RAD}, // Joint1 base rotation (19.5 + 2.5 cm)
-            {0.15f, 0.0f * DEG2RAD, 0.00f, 90.0f * DEG2RAD}, // Joint2 pitch 
+            {0.25f, 0.0f * DEG2RAD, 0.00f, 90.0f * DEG2RAD}, // Joint2 pitch 
             {0.00f, 90.0f * DEG2RAD, 0.00f, 90.0f * DEG2RAD}, // Joint3 second pitch (a3 used if the arm has a lateral offset)
 
-            {0.00f, -90.0f * DEG2RAD, 0.15f, 0.0f * DEG2RAD}, // Joint4 forearm rotation 
+            {0.00f, -90.0f * DEG2RAD, 0.25f, 0.0f * DEG2RAD}, // Joint4 forearm rotation 
             {0.00f, 90.0f * DEG2RAD, 0.00f, 0.0f * DEG2RAD}, // Joint5 PITCH (for YAW, the arm will rotate Joint4 +-90 degrees)
             {0.00f, 0.0f * DEG2RAD, 0.11f, 0.0f * DEG2RAD}  // Joint6 end claw/suction rotation
 
@@ -57,20 +59,20 @@ inline RobotModel createDefaultRobotModel()
         // Set min and max theta values to represent the joint limits and
         // avoids breaking. Modified for different motors/robot-settings.
         {
-            -10000.0f * DEG2RAD, // Infinite (no limit)
-            -90.0f * DEG2RAD,
+            -kInfinity, // Infinite (no limit)
+            -45.0f * DEG2RAD, // Prevents singularities. Always approach from front
             -150.0f * DEG2RAD,
-            -10000.0f * DEG2RAD, // Infinite (no limit)
-            -90.0f * DEG2RAD,
-            -10000.0f * DEG2RAD, // Infinite (no limit)
+            -kInfinity, // Infinite (no limit)
+            -135.0f * DEG2RAD,
+            -kInfinity, // Infinite (no limit)
         },
         {
-            10000.0f * DEG2RAD, // Infinite (no limit)
+            kInfinity, // Infinite (no limit)
             90.0f * DEG2RAD,
             150.0f * DEG2RAD,
-            10000.0f * DEG2RAD, // Infinite (no limit)
+            kInfinity, // Infinite (no limit)
             90.0f * DEG2RAD,
-            10000.0f * DEG2RAD, // Infinite (no limit)
+            kInfinity, // Infinite (no limit)
         },
         {0.1f * DEG2RAD, -30.0f * DEG2RAD, 90.0f * DEG2RAD, 0.0f * DEG2RAD, 90.0f * DEG2RAD, 0.0f * DEG2RAD}, // homeAngles - starting angles position
     };

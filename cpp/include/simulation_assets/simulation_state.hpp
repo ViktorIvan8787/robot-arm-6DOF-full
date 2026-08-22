@@ -3,6 +3,7 @@
 #include "robot_arm/kinematics.hpp"
 #include "robot_arm/pathways.hpp"
 #include "robot_arm/robot.hpp"
+#include "simulation_assets/hud.hpp"
 
 #include <cstddef>
 #include <raymath.h>
@@ -28,15 +29,29 @@ struct SimulationState {
     float targetDistance = 0.0f;
     // Target orientation (angle robot approaches from)
     Matrix targetOrientation = MatrixRotateX(180.0f * DEG2RAD); // Comes from above (Z)
+    // Tracking velocity and position for stats
+    Vector3 endEffectorPosition {};
+    Vector3 endEffectorVelocity {};
+    Vector3 previousEndEffectorPosition {};
 
     // ========== ARM USER CONTROL ==========
     std::size_t selectedJoint = 0;
     bool enforceJointLimits = true; // (angular)
 
     // ========= PATHWAY TRACING VARIABLES & SHAPES =========
+    // Home angles
+    bool returningHome = false;
     // (Starts at none)
     robot_arm::PathwayShape pathwayShape = robot_arm::PathwayShape::None;
     std::vector<Vector3> pathwayPoints;
     std::size_t currentWaypoint = 0;
     bool pathwayMode = false;
+
+    // ========= ARM RENDERING ===========
+    bool toggleRobotDesign = false;
+
+    // ========= HUD =========
+    bool hudVisible = true;
+    HudTab activeHudTab = HudTab::TargetMode;
+    Font hudFont {};
 };

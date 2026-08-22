@@ -32,11 +32,11 @@ std::vector<Vector3> createPathwayPoints(PathwayShape shape, float radius)
         return {
             {-0.3f, 0.3f, 0.3f},
             {-0.3f, -0.3f, 0.3f},
-            {-0.3f, -0.3f, -0.3f},
-            {0.3f, -0.3f, -0.3f},
-            {-0.3f, 0.3f, -0.3f},
+            {-0.3f, -0.3f, -0.0f},
+            {0.3f, -0.3f, -0.0f},
+            {-0.3f, 0.3f, -0.0f},
             {0.3f, -0.3f, 0.3f},
-            {0.3f, 0.3f, -0.3f},
+            {0.3f, 0.3f, -0.0f},
             {0.3f, 0.3f, 0.3f},
         };
 
