@@ -1,4 +1,3 @@
-# Code for camera to detect objects using YOLO
 import numpy as np
 
 from camera import Camera
