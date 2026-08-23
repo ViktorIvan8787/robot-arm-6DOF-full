@@ -1,12 +1,7 @@
-import numpy as np
-
 from camera import Camera
 from ultralytics import YOLO
 from dataclasses import dataclass
-from numpy.typing import NDArray
-
-# Custom Data type for a frame, which is a numpy array of uint8 values
-Frame = NDArray[np.uint8]
+from camera.camera_types import Frame
 
 # Custom data class to hold the detection
 @dataclass

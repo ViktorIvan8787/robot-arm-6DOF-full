@@ -1,11 +1,7 @@
 import cv2
-import numpy as np
 import warnings
 
-from numpy.typing import NDArray
-
-# Actual type of a frame
-Frame = NDArray[np.uint8]
+from camera.camera_types import Frame
 
 class Camera:
     """Manage frame capture from an OpenCV-compatible camera.
