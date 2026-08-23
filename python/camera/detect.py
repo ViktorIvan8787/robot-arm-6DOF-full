@@ -48,6 +48,20 @@ def analyse(frame: Frame, model: YOLO) -> list[Detection]:
             detections.append(Detection(class_name, confidence, float(centre_x), float(centre_y)))
     return detections
 
+# Function to detect the object in the image 
+def detect(detections: list[Detection], target_class: str, min_confidence: float = 0.5) -> DetectionResult:
+    """Chose the detection that has the same class name as the target class and has the highest confidence"""
+
+    # List comprehension to filter out any detected objects that do not match the criteria
+    candidates = [d for d in detections if d.class_name == target_class and d.confidence >= min_confidence]
+
+    # if there are no candidates then return False
+    if not candidates:
+        return DetectionResult(False, None)
+
+    # Otherwise pick the best match (detection with highest confidence)
+    best_match = max(candidates, key = lambda d: d.confidence)
+    return DetectionResult(True, best_match)
 # Open camera make sure that it reads frame properly and capture the frame
 # Capture a still image from the video camera {default camera: 0} 
 cap = cv2.VideoCapture(0)
