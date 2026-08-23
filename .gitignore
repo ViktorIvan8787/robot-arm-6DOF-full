@@ -77,3 +77,6 @@ __pycache__/
 
 # Python virtual environment
 .venv/
+
+# Yolo model cache
+*.pt

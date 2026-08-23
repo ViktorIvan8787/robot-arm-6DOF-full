@@ -1,7 +1,7 @@
 import cv2
 import warnings
 
-from camera.camera_types import Frame
+from .camera_types import Frame
 
 class Camera:
     """Manage frame capture from an OpenCV-compatible camera.
@@ -32,9 +32,9 @@ class Camera:
         self._capture.set(cv2.CAP_PROP_FPS, fps)
 
         # Obtain camera property values using property ID
-        actual_width = self._capture.get(cv2.CAP_PROP_FRAME_WIDTH, width)
-        actual_height = self._capture.get(cv2.CAP_PROP_FRAME_HEIGHT, height)
-        actual_fps = self._capture.get(cv2.CAP_PROP_FPS, fps)
+        actual_width = self._capture.get(cv2.CAP_PROP_FRAME_WIDTH)
+        actual_height = self._capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        actual_fps = self._capture.get(cv2.CAP_PROP_FPS)
     
         # Incorrect width and height means calibration will not be correct
         if actual_width != width and actual_height != height:
@@ -47,13 +47,13 @@ class Camera:
         if actual_fps < fps:
             warnings.warn(
                 "CAM_WARNING: Camera FPS differs from requested FPS",
-                RuntimeWarning,
+                RuntimeWarning
             )
 
     # Returns a single frame, if it cannot then raise an error
     def read(self) -> Frame:
         """Return one singular image frame"""
-        success, frame = self._capture.read(self)
+        success, frame = self._capture.read()
 
         if not success:
             raise RuntimeError(
