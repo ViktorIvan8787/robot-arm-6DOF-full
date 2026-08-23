@@ -17,16 +17,6 @@ class DetectionResult:
     found: bool
     detection: Detection | None # if no detection was found
 
-# Function to load the model 
-def load_model(model_path: str = "yolov8n.pt") -> YOLO:
-    """Load the YOLO model from the specified path."""
-    return YOLO(model_path)
-
-# Function to capture the frame 
-def capture_frame(camera: Camera) -> Frame:
-    """Capture a single still frame using camera class functions."""
-    return camera.read()
-
 # Function to analyse the frame and produce a list of detected objects
 def analyse(frame: Frame, model: YOLO) -> list[Detection]:
     """Pass the frame into the YOLO mdoel to detect the different objects and produce a list of these objects"""
