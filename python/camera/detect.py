@@ -1,20 +1,41 @@
 # Code for camera to detect objects using YOLO [Currently only detects "cup" (there is no input right now)]
 
-# Open camera make sure that it reads frame properly and capture the frame
-
 import cv2
+import numpy as np
+
 from ultralytics import YOLO
+from dataclasses import dataclass
+from numpy.typing import NDArray
 
-# Load the model 
-model = YOLO("yolov8n.pt")
+# Custom Data type for a frame, which is a numpy array of uint8 values
+Frame = NDArray[np.uint8]
 
+# Custom data class to hold the detection
+@dataclass
+class Detection:
+    class_name: str
+    confidence: float
+    centre_x: float
+    centre_y: float
+
+# Custom data class to hold Detection result
+@dataclass
+class DetectionResult:
+    found: bool
+    detection: Detection | None # if no detection was found
+
+# Function to load the model 
+def load_model(model_path: str = "yolov8n.pt") -> YOLO:
+    """Load the YOLO model from the specified path."""
+    return YOLO(model_path)
+
+# Open camera make sure that it reads frame properly and capture the frame
 # Capture a still image from the video camera {default camera: 0} 
 cap = cv2.VideoCapture(0)
 ret, frame = cap.read()
 cap.release()
 
 # Check if the frame was read correctly using the ret variable
-
 if not ret :
     raise RuntimeError("Failed to capture image")
 
