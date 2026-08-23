@@ -1,6 +1,4 @@
 # Code for camera to detect objects using YOLO [Currently only detects "cup" (there is no input right now)]
-
-import cv2
 import numpy as np
 
 from camera import Camera
