@@ -3,6 +3,7 @@
 import cv2
 import numpy as np
 
+from camera import Camera
 from ultralytics import YOLO
 from dataclasses import dataclass
 from numpy.typing import NDArray
@@ -28,6 +29,11 @@ class DetectionResult:
 def load_model(model_path: str = "yolov8n.pt") -> YOLO:
     """Load the YOLO model from the specified path."""
     return YOLO(model_path)
+
+# Function to capture the frame 
+def capture_frame(camera: Camera) -> Frame:
+    """Capture a single still frame using camera class functions."""
+    return camera.read()
 
 # Open camera make sure that it reads frame properly and capture the frame
 # Capture a still image from the video camera {default camera: 0} 
