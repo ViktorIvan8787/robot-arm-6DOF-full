@@ -35,6 +35,19 @@ def capture_frame(camera: Camera) -> Frame:
     """Capture a single still frame using camera class functions."""
     return camera.read()
 
+# Function to analyse the frame and produce a list of detected objects
+def analyse(frame: Frame, model: YOLO) -> list[Detection]:
+    """Pass the frame into the YOLO mdoel to detect the different objects and produce a list of these objects"""
+    results = model(frame)
+    detections = []
+    for result in results:
+        for box in result.boxes:
+            class_name = model.names[int(box.cls[0])]
+            confidence = float(box.conf[0])
+            centre_x, centre_y, _,_ = box.xywh[0]
+            detections.append(Detection(class_name, confidence, float(centre_x), float(centre_y)))
+    return detections
+
 # Open camera make sure that it reads frame properly and capture the frame
 # Capture a still image from the video camera {default camera: 0} 
 cap = cv2.VideoCapture(0)
