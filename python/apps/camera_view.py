@@ -1,6 +1,6 @@
-from .detect import *
-from .camera import Camera
-from .config_loader import load_camera_config, load_model_config
+from arm.vision.camera import Camera
+from arm.vision.detect import *
+from arm.config_loader import load_camera_config, load_model_config
 
 def main() -> None:
     
