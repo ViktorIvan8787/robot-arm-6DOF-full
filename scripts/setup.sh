@@ -61,3 +61,20 @@ echo
 echo "Setup complete."
 echo "You can now run:"
 echo "  ./scripts/simulator.sh"
+
+echo "Syncing python packages for python camera applications..."
+
+sleep 2
+
+repository_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if ! command -v uv >/dev/null 2>&1; then
+    echo "Error: uv is not installed."
+    echo "Install it with:"
+    echo "curl -LsSf https://astral.sh/uv/install.sh | sh"
+    exit 1
+fi
+
+echo "Setting up Python environment..."
+cd "$repository_directory/python"
+uv sync
