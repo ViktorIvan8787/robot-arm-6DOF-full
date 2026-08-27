@@ -48,7 +48,7 @@ class Camera:
         actual_fps = self._capture.get(cv.CAP_PROP_FPS)
     
         # Incorrect width and height means calibration will not be correct
-        if actual_width != width and actual_height != height:
+        if actual_width != width or actual_height != height:
             raise RuntimeError(
                 "CAM_ERROR: Could not set width and height to 720p settings" \
                 f"Expected: {width}x{height}, Got: {actual_width}x{actual_height}"
