@@ -2,7 +2,7 @@ import cv2 as cv
 import warnings
 
 from .camera_types import Frame
-from .detect import Detection
+from .detect import Detection, highlightObject
 
 class Camera:
     """Manage frame capture from an OpenCV-compatible camera.
@@ -63,6 +63,11 @@ class Camera:
                 RuntimeWarning
             )
 
+    @property
+    def is_open(self) -> bool:
+        """Return whether the camera device is open."""
+        return self._capture.isOpened()
+
     # Use the _capture attribute method to display camera output on another window
     # Press a certain key to quit the application, hence the function returns false
     def display(self,
@@ -71,12 +76,7 @@ class Camera:
     ) -> bool:
         """Display camera on a separate window, return false if quitting application"""
         
-        # Every object detected will be pinpointed on the camera window
-        for obj in objects:
-            # Change the colour based on the confidence
-            colour = (0, obj.confidence * 255, 255 - obj.confidence * 255)
-            cv.rectangle(frame, (obj.x1, obj.y1), (obj.x2, obj.y2), colour, 3)
-            cv.putText(frame, obj.class_name, (obj.x1 + 5, obj.y1 + 15), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        frame = highlightObject(frame, objects)
 
         cv.imshow('window', frame)
         
@@ -99,5 +99,5 @@ class Camera:
     
     def close(self) -> None:
         """Free camera usage by clearing capture property and quit separate window for displaying camera"""
-        if self._capture.isOpened():
+        if self.is_open:
             self._capture.release()
