@@ -13,7 +13,8 @@ def main() -> None:
         camera_config.device,
         camera_config.width,
         camera_config.height,
-        camera_config.fps
+        camera_config.fps,
+        camera_config.format
     )
 
     try:
@@ -21,6 +22,7 @@ def main() -> None:
             frame = camera.read()
             objects_identified = analyse(frame, yolo_model)
             result = detect(objects_identified, "phone")
+            camera.display(frame)
     finally:
         camera.close()
 

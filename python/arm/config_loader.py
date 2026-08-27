@@ -19,6 +19,7 @@ class CameraConfig:
     width: int
     height: int
     fps: int
+    format: str
 
 # Helper function used to load yaml files as well as error handle non existent paths
 def load_yaml(path: Path) -> dict[str, Any]:
@@ -38,6 +39,7 @@ def load_camera_config() -> CameraConfig:
         width = data["width"],
         height = data["height"],
         fps = data["fps"],
+        format = data["format"]
     )
 
 # Return the string name of the YOLO model
