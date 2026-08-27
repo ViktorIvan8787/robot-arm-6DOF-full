@@ -99,5 +99,5 @@ class Camera:
     
     def close(self) -> None:
         """Free camera usage by clearing capture property and quit separate window for displaying camera"""
-        self._capture.release()
-        cv.destroyAllWindows()
+        if self._capture.isOpened():
+            self._capture.release()
