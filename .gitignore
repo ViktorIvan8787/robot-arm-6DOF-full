@@ -70,3 +70,13 @@ Testing/
 
 # IDE configurations
 .vscode/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+
+# Python virtual environment
+.venv/
+
+# Yolo model cache
+*.pt
