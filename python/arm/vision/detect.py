@@ -1,4 +1,4 @@
-from .camera import Camera
+from typing import Tuple
 from ultralytics import YOLO # type: ignore
 from dataclasses import dataclass
 from .camera_types import Frame
@@ -8,8 +8,10 @@ from .camera_types import Frame
 class Detection:
     class_name: str
     confidence: float
-    centre_x: float
-    centre_y: float
+    x1: int
+    y1: int
+    x2: int
+    y2: int
 
 # Custom data class to hold Detection result
 @dataclass
@@ -28,8 +30,8 @@ def analyse(frame: Frame, model: YOLO) -> list[Detection]:
         for box in result.boxes:
             class_name = model.names[int(box.cls[0])]
             confidence = float(box.conf[0])
-            centre_x, centre_y, _,_ = box.xywh[0]
-            detections.append(Detection(class_name, confidence, float(centre_x), float(centre_y)))
+            x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
+            detections.append(Detection(class_name, confidence, x1, y1, x2, y2))
     return detections
 
 # Return a dataclass with a found flag to signify if target object has been detected

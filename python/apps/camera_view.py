@@ -14,15 +14,19 @@ def main() -> None:
         camera_config.width,
         camera_config.height,
         camera_config.fps,
+        # Required depending on the camera you are using
         camera_config.format
     )
 
+    # Loop can be set to false if user presses the button to quit camera application
+    loop = True
+
     try:
-        while True:
+        while loop:
             frame = camera.read()
             objects_identified = analyse(frame, yolo_model)
-            result = detect(objects_identified, "phone")
-            camera.display(frame)
+            # result = detect(objects_identified, "")
+            loop = camera.display(objects_identified, frame)
     finally:
         camera.close()
 
