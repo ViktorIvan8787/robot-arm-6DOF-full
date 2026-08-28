@@ -57,6 +57,9 @@ def detect(detections: list[Detection], target_class: str, min_confidence: float
 
 def highlightObject(frame: Frame, objects: list[Detection]) -> Frame:
 
+    if not objects:
+        return frame
+
     # Every object detected will be pinpointed on the camera window
     for obj in objects:
         # Change the colour based on the confidence

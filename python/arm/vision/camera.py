@@ -5,7 +5,8 @@ from .camera_types import Frame
 from .detect import Detection, highlightObject
 
 class Camera:
-    """Manage frame capture from an OpenCV-compatible camera.
+    """
+    Manage frame capture from an OpenCV-compatible camera.
 
     Configures the requested resolution and frame rate, validates the
     resulting camera settings, and manages frame acquisition and release.
@@ -65,7 +66,7 @@ class Camera:
 
     @property
     def is_open(self) -> bool:
-        """Return whether the camera device is open."""
+        """Return whether the camera device is open"""
         return self._capture.isOpened()
 
     # Use the _capture attribute method to display camera output on another window

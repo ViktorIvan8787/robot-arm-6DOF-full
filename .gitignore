@@ -70,6 +70,7 @@ Testing/
 
 # IDE configurations
 .vscode/
+.continue/
 
 # Python cache files
 __pycache__/
