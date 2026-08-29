@@ -1,3 +1,5 @@
+import cv2 as cv
+
 from arm.vision.camera import Camera
 from arm.vision.detect import *
 from arm.config_loader import load_camera_config, load_model_config
@@ -29,6 +31,7 @@ def main() -> None:
             loop = camera.display(objects_identified, frame)
     finally:
         camera.close()
+        cv.destroyAllWindows()
 
 if __name__ == "__main__":
     main()

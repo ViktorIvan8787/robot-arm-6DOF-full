@@ -1,3 +1,9 @@
+from cv2 import (
+    rectangle,
+    putText,
+    FONT_HERSHEY_SIMPLEX,
+)
+
 from typing import Tuple
 from ultralytics import YOLO # type: ignore
 from dataclasses import dataclass
@@ -48,3 +54,17 @@ def detect(detections: list[Detection], target_class: str, min_confidence: float
     # Otherwise pick the best match (detection with highest confidence)
     best_match = max(candidates, key = lambda d: d.confidence)
     return DetectionResult(True, best_match)
+
+def highlightObject(frame: Frame, objects: list[Detection]) -> Frame:
+
+    if not objects:
+        return frame
+
+    # Every object detected will be pinpointed on the camera window
+    for obj in objects:
+        # Change the colour based on the confidence
+        colour = (255 - obj.confidence * 255, obj.confidence * 255, 0)
+        new_frame = rectangle(frame, (obj.x1, obj.y1), (obj.x2, obj.y2), colour, 3)
+        new_frame = putText(frame, obj.class_name, (obj.x1 + 5, obj.y1 + 15), FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
+    return new_frame
