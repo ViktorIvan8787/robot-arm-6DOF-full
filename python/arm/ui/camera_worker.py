@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from cv2 import cvtColor, COLOR_BGR2RGB
 from collections.abc import Callable
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
+from cv2 import cvtColor, COLOR_BGR2RGB
 from arm.vision.camera import Camera
 from arm.config_loader import load_model_config
 from ultralytics import YOLO
@@ -35,6 +35,8 @@ class CameraWorker(QObject):
         self._camera: Camera | None = None
         self._timer: QTimer | None = None
 
+        self._full_detection_enabled = False
+
         # Storing the result of detect() as an attribute
         # Easily accessible by the main thread
         self.objectDetected: DetectionResult | None = None
@@ -43,7 +45,7 @@ class CameraWorker(QObject):
 
     @Slot()
     def start(self) -> None:
-        """Open the camera and begin reading frames"""
+        """Open the camera and begin reading frames."""
         if self._camera is not None:
             return
 
@@ -65,7 +67,7 @@ class CameraWorker(QObject):
 
     @Slot()
     def stop(self) -> None:
-        """Stop frame capture and release the camera"""
+        """Stop frame capture and release the camera."""
         was_running = self._camera is not None
 
         if self._timer is not None:
@@ -79,7 +81,7 @@ class CameraWorker(QObject):
 
     @Slot()
     def _read_frame(self) -> None:
-        """Read and emit a single frame"""
+        """Read and emit a single frame."""
         if self._camera is None:
             return
 
@@ -95,8 +97,13 @@ class CameraWorker(QObject):
 
         self.frame_ready.emit(updated_frame)
 
+    @Slot(bool)
+    def set_full_detection_enabled(self, enabled: bool) -> None:
+        """Enable or disable object detection and highlighting."""
+        self._full_detection_enabled = enabled
+
     def _close_camera(self) -> None:
-        """Close and discard the current camera instance"""
+        """Close and discard the current camera instance."""
         if self._camera is None:
             return
         
@@ -104,7 +111,13 @@ class CameraWorker(QObject):
         self._camera = None
 
     def _process_frame(self, frame: Frame) -> Frame:
-        """Process the frame to highlight objects"""
+        """Process the frame to highlight objects if full detection is enabled."""
         rgb_frame = cvtColor(frame, COLOR_BGR2RGB)
-        updated_frame = highlightObject(rgb_frame, analyse(rgb_frame, self._YOLO_Model))
-        return updated_frame
+
+        if not self._full_detection_enabled:
+            return rgb_frame
+
+        detections = analyse(rgb_frame, self._YOLO_Model)
+        self.objectDetected = detections
+
+        return highlightObject(rgb_frame, detections)

@@ -58,6 +58,21 @@ styles:
         border-color: #2C3139;
     }
 
+    QPushButton#detectionButton:checked {
+        background-color: #4B91EE;
+        color: #FFFFFF;
+        border-color: #78AEF5;
+    }
+
+    QPushButton#detectionButton:checked:hover {
+        background-color: #5A9EF4;
+        border-color: #91BDF7;
+    }
+
+    QPushButton#detectionButton:checked:pressed {
+        background-color: #397DD8;
+    }
+
   command_bar: |
     QWidget#commandBar {
         background-color: #111419;

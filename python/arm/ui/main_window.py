@@ -31,6 +31,7 @@ CAMERA_CONFIG = load_camera_config()
 class MainWindow(QMainWindow):
     start_camera_requested = Signal()
     stop_camera_requested = Signal()
+    full_detection_requested = Signal(bool)
 
     def __init__(self) -> None:
         super().__init__()
@@ -64,6 +65,11 @@ class MainWindow(QMainWindow):
         self._submit_button.setObjectName("submitButton")
         self._submit_button.setEnabled(False)
         self._detection_button = QPushButton("Full Detection")
+        self._detection_button.setObjectName("detectionButton")
+        self._detection_button.setCheckable(True)
+        self._detection_button.setChecked(False)
+        self._detection_button.setEnabled(False)
+
         self._clear_log_button = QPushButton("Clear Log")
         self._link_arm_button = QPushButton("Link Arm")
 
@@ -155,12 +161,15 @@ class MainWindow(QMainWindow):
         self._command_input.textChanged.connect(self._update_submit_button)
         self._submit_button.clicked.connect(self._on_submit_button_clicked)
         self._clear_log_button.clicked.connect(self._log_widget.clear_log)
+        self._link_arm_button.clicked.connect(self._on_link_arm_button_clicked)
+        self._detection_button.toggled.connect(self._on_full_detection_toggled)
 
         # Camera worker functionality
         self._camera_worker.frame_ready.connect(self._camera_widget.set_frame)
         self._camera_worker.started.connect(self._on_camera_started)
         self._camera_worker.stopped.connect(self._on_camera_stopped)
         self._camera_worker.error.connect(self._on_camera_error)
+        self.full_detection_requested.connect(self._camera_worker.set_full_detection_enabled)
 
     # Camera worker functionality
 
@@ -189,6 +198,7 @@ class MainWindow(QMainWindow):
         self._log_widget.addLine(LogLevel.INFO, "camera running")
         self._start_button.setEnabled(False)
         self._stop_button.setEnabled(True)
+        self._detection_button.setEnabled(True)
 
     # Camera end button functionality
     @Slot()
@@ -197,6 +207,8 @@ class MainWindow(QMainWindow):
         self._camera_widget.clear_frame()
         self._start_button.setEnabled(True)
         self._stop_button.setEnabled(False)
+        self._detection_button.setChecked(False)
+        self._detection_button.setEnabled(False)
 
     @Slot(str)
     def _on_camera_error(self) -> None:
@@ -204,6 +216,8 @@ class MainWindow(QMainWindow):
         self._camera_widget.clear_frame()
         self._start_button.setEnabled(True)
         self._stop_button.setEnabled(False)
+        self._detection_button.setChecked(False)
+        self._detection_button.setEnabled(False)
 
     # Command input functionality
 
@@ -214,7 +228,6 @@ class MainWindow(QMainWindow):
             self._submit_button.setEnabled(False)
 
     def _on_submit_button_clicked(self) -> None:
-
         input_text = self._command_input.text()
         
         # Handling empty command input
@@ -224,6 +237,22 @@ class MainWindow(QMainWindow):
         self._log_widget.addLine(LogLevel.CMD, input_text)
         self._log_widget.addLine(LogLevel.DEBUG, "parsing command data...")
         self._command_input.clear()
+
+    # Link arm button functionality
+    def _on_link_arm_button_clicked(self) -> None:
+        # For now just output a message
+        self._log_widget.addLine(LogLevel.DEBUG, "linking arm...")
+        self._log_widget.addLine(LogLevel.ERROR, "failed to connect to arm", Colour.RED)
+
+    # Full detection mode for identifying all objects
+    @Slot(bool)
+    def _on_full_detection_toggled(self, enabled: bool) -> None:
+        self.full_detection_requested.emit(enabled)
+
+        if enabled:
+            self._log_widget.addLine(LogLevel.INFO, "full detection enabled", Colour.BLUE)
+        else:
+            self._log_widget.addLine(LogLevel.INFO, "full detection disabled", Colour.YELLOW)
         
     # Close any threads that are running when exiting the program
     def closeEvent(self, event: QCloseEvent) -> None:
