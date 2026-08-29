@@ -37,6 +37,8 @@ class MainWindow(QMainWindow):
         self._create_camera_worker()
         self._connect_signals()
 
+    # Private layout/widget setup functions
+
     # Keep the init function small by having all the widgets in a private function
     def _create_widgets(self) -> None:
         self._camera_widget = CameraWidget()
@@ -46,6 +48,7 @@ class MainWindow(QMainWindow):
         self._command_input = QLineEdit()
         self._command_input.setPlaceholderText("Enter command")
 
+        self._submit_button = QPushButton("Submit")
         self._start_button = QPushButton("Start Camera")
         self._stop_button = QPushButton("Stop Camera")
         self._stop_button.setEnabled(False)
@@ -53,16 +56,35 @@ class MainWindow(QMainWindow):
     def _create_layout(self) -> None:
         layout = QGridLayout()
 
-        layout.addWidget(self._camera_widget, 0, 0, 4, 1)
+        layout.addWidget(self._camera_widget, 0, 0)
         layout.addWidget(self._status_label, 0, 1)
-        layout.addWidget(self._command_input, 1, 1)
-        layout.addWidget(self._start_button, 2, 1)
-        layout.addWidget(self._stop_button, 3, 1)
+        layout.addWidget(self._command_input, 1, 0)
+        layout.addWidget(self._submit_button, 1, 1)
+        layout.addWidget(self._start_button, 2, 0)
+        layout.addWidget(self._stop_button, 3, 0)
 
         central_widget = QWidget()
         central_widget.setLayout(layout)
 
         self.setCentralWidget(central_widget)
+
+    # Separating the camera requests, buttons and the thread to run the camera display
+    def _connect_signals(self) -> None:
+        self.start_camera_requested.connect(self._camera_worker.start)
+        self.stop_camera_requested.connect(self._camera_worker.stop)
+
+        self._command_input.textChanged.connect(self._update_submit_button)
+        self._submit_button.clicked.connect(self._on_submit_button_clicked)
+
+        self._start_button.clicked.connect(self.start_camera_requested.emit)
+        self._stop_button.clicked.connect(self.stop_camera_requested.emit)
+
+        self._camera_worker.frame_ready.connect(self._camera_widget.set_frame)
+        self._camera_worker.started.connect(self._on_camera_started)
+        self._camera_worker.stopped.connect(self._on_camera_stopped)
+        self._camera_worker.error.connect(self._on_camera_error)
+
+    # Camera worker functionality
 
     # Create a camera worker private to main window using config values
     def _create_camera_worker(self) -> None:
@@ -86,19 +108,6 @@ class MainWindow(QMainWindow):
         self._camera_worker.moveToThread(self._camera_thread)
         self._camera_thread.start()
 
-    # Separating the camera requests, buttons and the thread to run the camera display
-    def _connect_signals(self) -> None:
-        self.start_camera_requested.connect(self._camera_worker.start)
-        self.stop_camera_requested.connect(self._camera_worker.stop)
-
-        self._start_button.clicked.connect(self.start_camera_requested.emit)
-        self._stop_button.clicked.connect(self.stop_camera_requested.emit)
-
-        self._camera_worker.frame_ready.connect(self._camera_widget.set_frame)
-        self._camera_worker.started.connect(self._on_camera_started)
-        self._camera_worker.stopped.connect(self._on_camera_stopped)
-        self._camera_worker.error.connect(self._on_camera_error)
-
     # Camera start button functionality
     @Slot()
     def _on_camera_started(self) -> None:
@@ -121,6 +130,19 @@ class MainWindow(QMainWindow):
         self._start_button.setEnabled(True)
         self._stop_button.setEnabled(False)
 
+    # Command input functionality
+
+    def _update_submit_button(self) -> None:
+        if self._command_input.text():
+            self._submit_button.setEnabled(True)
+        else:
+            self._submit_button.setEnabled(False)
+
+    def _on_submit_button_clicked(self) -> None:
+        input_text = self._command_input.text()
+        
+        self._command_input.clear()
+        
     # Close any threads that are running when exiting the program
     def closeEvent(self, event: QCloseEvent) -> None:
         if self._camera_thread.isRunning():

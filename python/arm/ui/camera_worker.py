@@ -1,7 +1,12 @@
 from __future__ import annotations
+
+from cv2 import cvtColor, COLOR_BGR2RGB
 from collections.abc import Callable
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
 from arm.vision.camera import Camera
+from arm.config_loader import load_model_config
+from ultralytics import YOLO
+from arm.vision.detect import *
 
 class CameraWorker(QObject):
     """
@@ -29,6 +34,12 @@ class CameraWorker(QObject):
 
         self._camera: Camera | None = None
         self._timer: QTimer | None = None
+
+        # Storing the result of detect() as an attribute
+        # Easily accessible by the main thread
+        self.objectDetected: DetectionResult | None = None
+
+        self._YOLO_Model = YOLO(load_model_config())
 
     @Slot()
     def start(self) -> None:
@@ -60,6 +71,7 @@ class CameraWorker(QObject):
         if self._timer is not None:
             self._timer.stop()
 
+        # 
         self._close_camera()
 
         if was_running:
@@ -72,13 +84,16 @@ class CameraWorker(QObject):
             return
 
         try:
+            # Read frame, convert to RGB and highlight object
             frame = self._camera.read()
+            updated_frame = self._process_frame(frame)
+
         except Exception as error:
             self.stop()
             self.error.emit(str(error))
             return
 
-        self.frame_ready.emit(frame)
+        self.frame_ready.emit(updated_frame)
 
     def _close_camera(self) -> None:
         """Close and discard the current camera instance"""
@@ -87,3 +102,9 @@ class CameraWorker(QObject):
         
         self._camera.close()
         self._camera = None
+
+    def _process_frame(self, frame: Frame) -> Frame:
+        """Process the frame to highlight objects"""
+        rgb_frame = cvtColor(frame, COLOR_BGR2RGB)
+        updated_frame = highlightObject(rgb_frame, analyse(rgb_frame, self._YOLO_Model))
+        return updated_frame

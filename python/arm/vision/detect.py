@@ -63,7 +63,7 @@ def highlightObject(frame: Frame, objects: list[Detection]) -> Frame:
     # Every object detected will be pinpointed on the camera window
     for obj in objects:
         # Change the colour based on the confidence
-        colour = (0, obj.confidence * 255, 255 - obj.confidence * 255)
+        colour = (255 - obj.confidence * 255, obj.confidence * 255, 0)
         new_frame = rectangle(frame, (obj.x1, obj.y1), (obj.x2, obj.y2), colour, 3)
         new_frame = putText(frame, obj.class_name, (obj.x1 + 5, obj.y1 + 15), FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 

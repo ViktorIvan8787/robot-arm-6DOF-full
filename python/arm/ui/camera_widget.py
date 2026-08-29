@@ -6,9 +6,6 @@ from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QImage, QPixmap, QResizeEvent
 from PySide6.QtWidgets import QLabel
 from arm.vision.camera_types import Frame
-# Note: Chaining down the YOLO import
-from arm.vision.detect import highlightObject, analyse, YOLO
-from arm.config_loader import load_model_config
 
 class CameraWidget(QLabel):
     """
@@ -22,7 +19,6 @@ class CameraWidget(QLabel):
     def __init__(self) -> None:
         super().__init__("Camera stopped")
 
-        self._YOLOModel = YOLO(load_model_config())
         self._source_pixmap: QPixmap | None = None
 
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -33,7 +29,6 @@ class CameraWidget(QLabel):
             QLabel {
                 background-color: #202020;
                 color: #d0d0d0;
-                border: 1px solid #505050;
             }
             """
         )
@@ -43,20 +38,19 @@ class CameraWidget(QLabel):
     @Slot(object)
     def set_frame(self, frame: Frame) -> None:
         """Convert and display an OpenCV BGR frame"""
-        rgb_frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
-        updated_frame = highlightObject(rgb_frame, analyse(rgb_frame, self._YOLOModel))
 
-        height, width, channels = updated_frame.shape
+        height, width, channels = frame.shape
         bytes_per_line = width * channels
 
         image = QImage(
-            updated_frame.data,
+            frame.data,
             width,
             height,
             bytes_per_line,
             QImage.Format.Format_RGB888,
         ).copy()
 
+        
         self._source_pixmap = QPixmap.fromImage(image)
         self._update_display()
 
