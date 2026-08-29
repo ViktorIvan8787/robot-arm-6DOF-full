@@ -1,5 +1,5 @@
 log:
-  max_lines: 512
+  max_lines: 1024
 
 styles:
   camera_widget: |
