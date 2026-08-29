@@ -36,8 +36,8 @@ class LogWidget(QPlainTextEdit):
         self._current_lines = 0
         self._lines = []
         
-        self.setMaximumHeight(720)
-        self.setMinimumHeight(720)
+        self.setMaximumHeight(1000)
+        self.setMinimumHeight(1000)
         
         self.setStyleSheet(style_settings)
         
@@ -63,6 +63,7 @@ class LogWidget(QPlainTextEdit):
         log_entry = f"[{timestamp}] {log_level} - {message}\n"
 
         self._lines.append(log_entry)
+        self._current_lines += 1
 
         if self._current_lines > self._max_lines:
             self._lines.pop(0)
@@ -71,4 +72,11 @@ class LogWidget(QPlainTextEdit):
         
         # Once new text is set, scroll to the bottom
         self.setPlainText(new_text)
+        self.verticalScrollBar().setValue(self.verticalScrollBar().maximum())
+
+    def clear_log(self):
+        # Reset the entire log and set to default
+        self._current_lines = 0
+        self._lines.clear()
+        self.setPlainText("")
         self.verticalScrollBar().setValue(self.verticalScrollBar().maximum())

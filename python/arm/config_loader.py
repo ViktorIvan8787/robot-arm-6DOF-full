@@ -64,6 +64,8 @@ class StyleConfig:
     camera_widget: str
     log_widget: str
     app_widget: str
+    button_widget: str
+    command_bar: str
 
 @dataclass
 class AppConfig:
@@ -80,7 +82,9 @@ def load_app_config() -> AppConfig:
     styles = StyleConfig(
         camera_widget = data["styles"]["camera_widget"],
         log_widget = data["styles"]["log_widget"],
-        app_widget = data["styles"]["app_widget"]
+        app_widget = data["styles"]["app_widget"],
+        button_widget = data["styles"]["button_widget"],
+        command_bar = data["styles"]["command_bar"],
     )
 
     return AppConfig(
