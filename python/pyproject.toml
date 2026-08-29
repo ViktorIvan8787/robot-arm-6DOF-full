@@ -1,6 +1,6 @@
 [project]
 name = "robot-arm-6dof"
-version = "0.7.0"
+version = "0.7.1"
 description = "Camera detection and control software for a 6-DOF robotic arm"
 requires-python = ">=3.11,<3.14"
 

@@ -199,9 +199,9 @@ class MainWindow(QMainWindow):
         self._stop_button.setEnabled(False)
 
     @Slot(str)
-    def _on_camera_error(self, message: str) -> None:
+    def _on_camera_error(self) -> None:
+        self._log_widget.addLine(LogLevel.ERROR, "camera connection failure", Colour.RED)
         self._camera_widget.clear_frame()
-        self._status_label.setText(message)
         self._start_button.setEnabled(True)
         self._stop_button.setEnabled(False)
 

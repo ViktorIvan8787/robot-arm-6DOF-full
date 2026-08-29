@@ -36,8 +36,8 @@ class LogWidget(QPlainTextEdit):
         self._current_lines = 0
         self._lines = []
         
-        self.setMaximumHeight(1000)
-        self.setMinimumHeight(1000)
+        self.setMaximumHeight(1050)
+        self.setMinimumHeight(1050)
         
         self.setStyleSheet(style_settings)
         
