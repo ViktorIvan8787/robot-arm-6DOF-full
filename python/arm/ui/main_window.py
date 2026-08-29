@@ -10,7 +10,6 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QGridLayout,
-    QLabel,
     QLineEdit,
     QMainWindow,
     QPushButton,
@@ -18,9 +17,15 @@ from PySide6.QtWidgets import (
 )
 
 from arm.vision.camera import Camera
+
 from arm.ui.camera_widget import CameraWidget
 from arm.ui.camera_worker import CameraWorker
-from arm.config_loader import load_camera_config
+from arm.ui.log_widget import LogWidget, LogLevel, Colour
+
+from arm.config_loader import load_camera_config, load_app_config
+
+APP_CONFIG = load_app_config()
+CAMERA_CONFIG = load_camera_config()
 
 class MainWindow(QMainWindow):
     start_camera_requested = Signal()
@@ -41,9 +46,12 @@ class MainWindow(QMainWindow):
 
     # Keep the init function small by having all the widgets in a private function
     def _create_widgets(self) -> None:
-        self._camera_widget = CameraWidget()
+        self._camera_widget = CameraWidget(APP_CONFIG.styles.camera_widget)
 
-        self._status_label = QLabel("Camera: stopped")
+        self._log_widget = LogWidget(
+            APP_CONFIG.styles.log_widget,
+            APP_CONFIG.log.max_lines
+        )
 
         self._command_input = QLineEdit()
         self._command_input.setPlaceholderText("Enter command")
@@ -57,7 +65,7 @@ class MainWindow(QMainWindow):
         layout = QGridLayout()
 
         layout.addWidget(self._camera_widget, 0, 0)
-        layout.addWidget(self._status_label, 0, 1)
+        layout.addWidget(self._log_widget, 0, 1)
         layout.addWidget(self._command_input, 1, 0)
         layout.addWidget(self._submit_button, 1, 1)
         layout.addWidget(self._start_button, 2, 0)
@@ -65,6 +73,8 @@ class MainWindow(QMainWindow):
 
         central_widget = QWidget()
         central_widget.setLayout(layout)
+
+        central_widget.setStyleSheet(APP_CONFIG.styles.app_widget)
 
         self.setCentralWidget(central_widget)
 
@@ -88,21 +98,18 @@ class MainWindow(QMainWindow):
 
     # Create a camera worker private to main window using config values
     def _create_camera_worker(self) -> None:
-
-        camera_config = load_camera_config()
-
         self._camera_thread = QThread(self)
 
         self._camera_worker = CameraWorker(
             camera_factory = lambda: Camera(
-                camera_config.device,
-                camera_config.width,
-                camera_config.height,
-                camera_config.fps,
+                CAMERA_CONFIG.device,
+                CAMERA_CONFIG.width,
+                CAMERA_CONFIG.height,
+                CAMERA_CONFIG.fps,
                 # Required depending on the camera you are using
-                camera_config.format
+                CAMERA_CONFIG.format
             ),
-            capture_fps = camera_config.fps,
+            capture_fps = CAMERA_CONFIG.fps,
         )
 
         self._camera_worker.moveToThread(self._camera_thread)
@@ -111,15 +118,15 @@ class MainWindow(QMainWindow):
     # Camera start button functionality
     @Slot()
     def _on_camera_started(self) -> None:
-        self._status_label.setText("Camera: running")
+        self._log_widget.addLine(LogLevel.INFO, "camera running")
         self._start_button.setEnabled(False)
         self._stop_button.setEnabled(True)
 
     # Camera end button functionality
     @Slot()
     def _on_camera_stopped(self) -> None:
+        self._log_widget.addLine(LogLevel.INFO, "camera stopped", Colour.YELLOW)
         self._camera_widget.clear_frame()
-        self._status_label.setText("Camera: stopped")
         self._start_button.setEnabled(True)
         self._stop_button.setEnabled(False)
 
@@ -139,8 +146,15 @@ class MainWindow(QMainWindow):
             self._submit_button.setEnabled(False)
 
     def _on_submit_button_clicked(self) -> None:
+
         input_text = self._command_input.text()
         
+        # Handling empty command input
+        if len(input_text) == 0:
+            return
+
+        self._log_widget.addLine(LogLevel.CMD, input_text)
+        self._log_widget.addLine(LogLevel.DEBUG, "parsing command data...")
         self._command_input.clear()
         
     # Close any threads that are running when exiting the program

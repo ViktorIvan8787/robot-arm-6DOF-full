@@ -16,7 +16,7 @@ class CameraWidget(QLabel):
 
     # Store a QPixmap for the newest frame to be added
     # YOLO model embedded into the camera widget, required for object detection
-    def __init__(self) -> None:
+    def __init__(self, style_settings: str) -> None:
         super().__init__("Camera stopped")
 
         self._source_pixmap: QPixmap | None = None
@@ -24,14 +24,7 @@ class CameraWidget(QLabel):
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setMinimumSize(1280, 720)
         self.setMaximumSize(1280, 720)
-        self.setStyleSheet(
-            """
-            QLabel {
-                background-color: #202020;
-                color: #d0d0d0;
-            }
-            """
-        )
+        self.setStyleSheet(style_settings)
 
     # Frame is received and processed under object highlighting
     # Essential attributes are set before setting the source pixel map
