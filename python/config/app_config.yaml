@@ -48,10 +48,6 @@ styles:
         border-color: #78A7ED;
     }
 
-    QPushButton:focus {
-        border: 1px solid #5893EC;
-    }
-
     QPushButton:disabled {
         background-color: #20242A;
         color: #646B76;
