@@ -55,15 +55,23 @@ def detect(detections: list[Detection], target_class: str, min_confidence: float
     best_match = max(candidates, key = lambda d: d.confidence)
     return DetectionResult(True, best_match)
 
-def highlightObject(frame: Frame, objects: list[Detection]) -> Frame:
+def highlightObject(frame: Frame, objects: list[Detection], target_object: Detection = None) -> Frame:
+    """Highlight the all objects detected on the camera window"""
 
     if not objects:
         return frame
+    
+    colour: tuple[int, int, int]
 
     # Every object detected will be pinpointed on the camera window
     for obj in objects:
-        # Change the colour based on the confidence
-        colour = (255 - obj.confidence * 255, obj.confidence * 255, 0)
+        # Highlight target object with blue
+        if target_object == obj:
+            colour = (0, 0, 255)
+        else: 
+            # Change the colour based on the confidence
+            colour = (255 - obj.confidence * 255, obj.confidence * 255, 0)
+
         new_frame = rectangle(frame, (obj.x1, obj.y1), (obj.x2, obj.y2), colour, 3)
         new_frame = putText(frame, obj.class_name, (obj.x1 + 5, obj.y1 + 15), FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
