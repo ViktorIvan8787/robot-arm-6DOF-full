@@ -2,7 +2,7 @@ import cv2 as cv
 import warnings
 
 from .camera_types import Frame
-from .detect import Detection, highlightObject
+from .detect import Detection
 
 class Camera:
     """
@@ -76,8 +76,6 @@ class Camera:
         frame: Frame
     ) -> bool:
         """Display camera on a separate window, return false if quitting application"""
-        
-        frame = highlightObject(frame, objects)
 
         cv.imshow('window', frame)
         

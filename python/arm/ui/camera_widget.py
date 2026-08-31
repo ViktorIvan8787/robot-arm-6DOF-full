@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import cv2 as cv
-
 from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QImage, QPixmap, QResizeEvent
 from PySide6.QtWidgets import QLabel
@@ -33,7 +31,7 @@ class CameraWidget(QLabel):
         """Convert and display an OpenCV BGR frame"""
 
         height, width, channels = frame.shape
-        bytes_per_line = width * channels
+        bytes_per_line = frame.strides[0]
 
         image = QImage(
             frame.data,

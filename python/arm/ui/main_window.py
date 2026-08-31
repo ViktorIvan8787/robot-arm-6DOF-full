@@ -23,15 +23,26 @@ from arm.ui.camera_widget import CameraWidget
 from arm.ui.camera_worker import CameraWorker
 from arm.ui.log_widget import LogWidget, LogLevel, Colour
 
-from arm.config_loader import load_camera_config, load_app_config
+from arm.config_loader import (
+    load_camera_config,
+    load_app_config,
+    load_grounding_dino_config,
+    load_grounding_dino_weights,
+    load_yolo_model
+)
 
 APP_CONFIG = load_app_config()
 CAMERA_CONFIG = load_camera_config()
+YOLO_CONFIG = load_yolo_model()
+GROUNDING_DINO_CONFIG = load_grounding_dino_config()
+GROUNDING_DINO_WEIGHTS = load_grounding_dino_weights()
 
 class MainWindow(QMainWindow):
     start_camera_requested = Signal()
     stop_camera_requested = Signal()
     full_detection_requested = Signal(bool)
+
+    detection_description_requested = Signal(str)
 
     def __init__(self) -> None:
         super().__init__()
@@ -163,6 +174,7 @@ class MainWindow(QMainWindow):
         self._clear_log_button.clicked.connect(self._log_widget.clear_log)
         self._link_arm_button.clicked.connect(self._on_link_arm_button_clicked)
         self._detection_button.toggled.connect(self._on_full_detection_toggled)
+        self._camera_worker.target_detected.connect(self._on_submit_button_clicked)
 
         # Camera worker functionality
         self._camera_worker.frame_ready.connect(self._camera_widget.set_frame)
@@ -170,6 +182,7 @@ class MainWindow(QMainWindow):
         self._camera_worker.stopped.connect(self._on_camera_stopped)
         self._camera_worker.error.connect(self._on_camera_error)
         self.full_detection_requested.connect(self._camera_worker.set_full_detection_enabled)
+        self.detection_description_requested.connect(self._camera_worker.set_detection_description)
 
     # Camera worker functionality
 
@@ -177,16 +190,21 @@ class MainWindow(QMainWindow):
     def _create_camera_worker(self) -> None:
         self._camera_thread = QThread(self)
 
+        # Receive a configured camera class
+        # And receive all model configs from main window (so one single import from main_window)
         self._camera_worker = CameraWorker(
-            camera_factory = lambda: Camera(
+            lambda: Camera(
                 CAMERA_CONFIG.device,
                 CAMERA_CONFIG.width,
                 CAMERA_CONFIG.height,
                 CAMERA_CONFIG.fps,
                 # Required depending on the camera you are using
-                CAMERA_CONFIG.format
+                CAMERA_CONFIG.format,
             ),
-            capture_fps = CAMERA_CONFIG.fps,
+            CAMERA_CONFIG.fps,
+            GROUNDING_DINO_CONFIG,
+            GROUNDING_DINO_WEIGHTS,
+            YOLO_CONFIG,
         )
 
         self._camera_worker.moveToThread(self._camera_thread)
@@ -204,6 +222,7 @@ class MainWindow(QMainWindow):
     @Slot()
     def _on_camera_stopped(self) -> None:
         self._log_widget.addLine(LogLevel.INFO, "camera stopped", Colour.YELLOW)
+        self._camera_worker.clear_detections()
         self._camera_widget.clear_frame()
         self._start_button.setEnabled(True)
         self._stop_button.setEnabled(False)
@@ -213,6 +232,7 @@ class MainWindow(QMainWindow):
     @Slot(str)
     def _on_camera_error(self) -> None:
         self._log_widget.addLine(LogLevel.ERROR, "camera connection failure", Colour.RED)
+        self._camera_worker.clear_detections()
         self._camera_widget.clear_frame()
         self._start_button.setEnabled(True)
         self._stop_button.setEnabled(False)
@@ -227,15 +247,36 @@ class MainWindow(QMainWindow):
         else:
             self._submit_button.setEnabled(False)
 
+    def _extract_object_description(self, command: str) -> str:
+        prefixes = (
+            "pick up ",
+            "find ",
+            "locate ",
+            "detect ",
+        )
+
+        normalised_command = command.strip()
+
+        for prefix in prefixes:
+            if normalised_command.lower().startswith(prefix):
+                return normalised_command[len(prefix):].strip()
+
+        return normalised_command
+
+    @Slot(str)
     def _on_submit_button_clicked(self) -> None:
-        input_text = self._command_input.text()
+        input_text = self._command_input.text().strip()
+        input_text = self._extract_object_description(input_text)
         
         # Handling empty command input
-        if len(input_text) == 0:
+        if len(input_text) == 0 or not input_text:
             return
+        
+        self.detection_description_requested.emit(input_text)
 
         self._log_widget.addLine(LogLevel.CMD, input_text)
         self._log_widget.addLine(LogLevel.DEBUG, "parsing command data...")
+        
         self._command_input.clear()
 
     # Link arm button functionality

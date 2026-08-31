@@ -7,13 +7,31 @@ from typing import Any
 
 UTF8 = "utf-8"
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 # Use this common path to yaml configs directory
-config_directory = Path(__file__).resolve().parents[1] / "config"
+CONFIG_DIRECTORY = PROJECT_ROOT / "config"
 
-camera_config_path = config_directory / "camera.yaml"
-model_config_path = config_directory / "yolo_model.yaml"
-app_config_path = config_directory / "app_config.yaml"
+CAMERA_CONFIG_PATH = CONFIG_DIRECTORY / "camera.yaml"
+APP_CONFIG_PATH = CONFIG_DIRECTORY / "app_config.yaml"
+YOLO_CONFIG_PATH = CONFIG_DIRECTORY / "yolo_model.yaml"
+
+# Path to grounding dino model configs/weights
+GROUNDING_DINO_DIRECTORY = (
+    PROJECT_ROOT
+    / "models"
+    / "grounding_dino"
+)
+
+GROUNDING_DINO_CONFIG_PATH = (
+    GROUNDING_DINO_DIRECTORY
+    / "GroundingDINO_SwinT_OGC.py"
+)
+
+GROUNDING_DINO_WEIGHTS_PATH = (
+    GROUNDING_DINO_DIRECTORY
+    / "groundingdino_swint_ogc.pth"
+)
 
 
 # Helper function used to load yaml files as well as error handle non existent paths
@@ -26,6 +44,7 @@ def load_yaml(path: Path) -> dict[str, Any]:
 
     return data
 
+# Loading camera configuration values
 
 # When returning this type to main, configuration values are stored together
 @dataclass
@@ -37,7 +56,7 @@ class CameraConfig:
     format: str
 
 def load_camera_config() -> CameraConfig:
-    data = load_yaml(camera_config_path)["camera"]
+    data = load_yaml(CAMERA_CONFIG_PATH)["camera"]
 
     return CameraConfig(
         device = data["device"],
@@ -47,11 +66,42 @@ def load_camera_config() -> CameraConfig:
         format = data["format"]
     )
 
+# Loading detection model values
 
-# Return the string name of the YOLO model
-def load_model_config() -> str:
-    return load_yaml(model_config_path)["model"]["name"]
+def load_grounding_dino_config() -> Path:
+    """Return the path to the Grounding DINO model configuration."""
 
+    if not GROUNDING_DINO_CONFIG_PATH.is_file():
+        raise FileNotFoundError(
+            "Grounding DINO configuration was not found at "
+            f"{GROUNDING_DINO_CONFIG_PATH}"
+        )
+
+    return GROUNDING_DINO_CONFIG_PATH
+
+
+def load_grounding_dino_weights() -> Path:
+    """Return the path to the Grounding DINO model weights."""
+
+    if not GROUNDING_DINO_WEIGHTS_PATH.is_file():
+        raise FileNotFoundError(
+            "Grounding DINO weights were not found at "
+            f"{GROUNDING_DINO_WEIGHTS_PATH}"
+        )
+
+    return GROUNDING_DINO_WEIGHTS_PATH
+
+def load_yolo_model() -> str:
+    """Return the YOLO model str to pass into YOLO model."""
+
+    if not YOLO_CONFIG_PATH.is_file():
+        raise FileNotFoundError(
+            "YOLO model was not found at "
+            f"{YOLO_CONFIG_PATH}"
+        )
+    
+    data = load_yaml(YOLO_CONFIG_PATH)
+    return data["model"]["name"]
 
 # App configuration values
 
@@ -73,7 +123,7 @@ class AppConfig:
     styles: StyleConfig
 
 def load_app_config() -> AppConfig:
-    data = load_yaml(app_config_path)
+    data = load_yaml(APP_CONFIG_PATH)
 
     log = LogConfig(
         max_lines = data["log"]["max_lines"]
