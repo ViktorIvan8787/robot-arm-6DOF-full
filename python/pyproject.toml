@@ -1,6 +1,6 @@
 [project]
 name = "robot-arm-6dof"
-version = "1.0.0"
+version = "1.2.1"
 description = "Camera detection and control software for a 6-DOF robotic arm"
 requires-python = ">=3.11,<3.14"
 
@@ -26,3 +26,6 @@ dev = [
 
 [tool.uv.sources]
 groundingdino = { git = "https://github.com/IDEA-Research/GroundingDINO.git" }
+
+[tool.uv.extra-build-dependencies]
+groundingdino = ["torch"]

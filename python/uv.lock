@@ -1476,7 +1476,7 @@ wheels = [
 
 [[package]]
 name = "robot-arm-6dof"
-version = "1.0.0"
+version = "1.2.1"
 source = { virtual = "." }
 dependencies = [
     { name = "groundingdino" },
