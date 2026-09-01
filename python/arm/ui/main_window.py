@@ -180,7 +180,6 @@ class MainWindow(QMainWindow):
         self._clear_log_button.clicked.connect(self._log_widget.clear_log)
         self._link_arm_button.clicked.connect(self._on_link_arm_button_clicked)
         self._detection_button.toggled.connect(self._on_full_detection_toggled)
-        self._camera_worker.target_detected.connect(self._on_submit_button_clicked)
 
         # Camera worker functionality
         self._camera_worker.frame_ready.connect(self._camera_widget.set_frame)
@@ -285,7 +284,7 @@ class MainWindow(QMainWindow):
     # Command input functionality
 
     def _update_submit_button(self) -> None:
-        has_command = bool(self._command_input.text())
+        has_command = bool(self._command_input.text().strip())
 
         self._submit_button.setEnabled(self._camera_running and has_command)
 
