@@ -34,11 +34,11 @@ class GroundingDinoWorker(QObject):
 
         try:
             self._detector = Detector(
-                config_path=self._config_path,
-                weights_path=self._weights_path,
-                yolo_model_name=self._yolo_model_name,
-                box_threshold=0.35,
-                text_threshold=0.25,
+                config_path = self._config_path,
+                weights_path = self._weights_path,
+                yolo_model_name = self._yolo_model_name,
+                box_threshold = 0.35,
+                text_threshold = 0.25,
             )
 
             self.ready.emit()

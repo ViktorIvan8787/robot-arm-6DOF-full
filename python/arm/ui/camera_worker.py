@@ -11,6 +11,8 @@ from cv2 import cvtColor, COLOR_BGR2RGB
 from arm.vision.detect import Detection, Detector, highlight_objects
 from arm.ui.grounding_dino_worker import GroundingDinoWorker
 
+TARGET_CONFIDENCE_THRESHOLD = 0.70
+
 class CameraWorker(QObject):
     """
     CameraWorker is responsible for managing the camera and capturing frames in a Qt compatible manner.
@@ -171,6 +173,19 @@ class CameraWorker(QObject):
             self.stop()
             self.error.emit(str(error))
 
+    @staticmethod
+    def _is_valid_detection(
+        detection: Detection | None,
+    ) -> bool:
+        """Return whether a detection is suitable as a target."""
+
+        return (
+            detection is not None
+            and detection.confidence >= TARGET_CONFIDENCE_THRESHOLD
+            and detection.width > 0
+            and detection.height > 0
+        )
+
     @Slot()
     def set_grounding_dino_ready(self) -> None:
         """Mark Grounding DINO as ready to receive requests."""
@@ -180,10 +195,30 @@ class CameraWorker(QObject):
     @Slot(str)
     def accept_grounding_dino_error(
         self,
-        error_message: str,
+        detections: list[Detection],
+        description: str,
     ) -> None:
+
         self._grounding_dino_busy = False
-        self.error.emit(error_message)
+
+        # Ignore a result belonging to an older command
+        if description != self._detection_description:
+            return
+
+        target = max(
+            detections,
+            key = lambda detection: detection.confidence,
+            default = None,
+        )
+
+        if not self._is_valid_detection(target):
+            self._target_object = None
+            return
+
+        self._grounded_detections = detections
+        self._target_object = target
+
+        self.target_detected.emit(target)
 
     @Slot(object, str)
     def accept_grounding_dino_result(
@@ -238,15 +273,15 @@ class CameraWorker(QObject):
             yolo_detections = self._vision_model.analyse(frame)
 
             highlighted_frame = highlight_objects(
-                frame=highlighted_frame,
-                objects=yolo_detections,
+                frame = highlighted_frame,
+                objects = yolo_detections,
             )
 
         if has_description:
             highlighted_frame = highlight_objects(
-                frame=highlighted_frame,
-                objects=self._grounded_detections,
-                target_object=self._target_object,
+                frame = highlighted_frame,
+                objects = self._grounded_detections,
+                target_object = self._target_object,
             )
 
         self._objects_detected = (

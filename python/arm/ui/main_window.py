@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from arm.vision.camera import Camera
+from arm.vision.detect import Detection
 from arm.ui.grounding_dino_worker import GroundingDinoWorker
 
 from arm.ui.camera_widget import CameraWidget
@@ -50,6 +51,8 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("6-DOF Arm Controller")
         self.resize(1920, 1080)
+
+        self._target_reported = False
 
         self._create_widgets()
         self._create_layout()
@@ -185,6 +188,8 @@ class MainWindow(QMainWindow):
         self.full_detection_requested.connect(self._camera_worker.set_full_detection_enabled)
         self.detection_description_requested.connect(self._camera_worker.set_detection_description)
 
+        self._camera_worker.target_detected.connect(self._on_target_detected)
+
     # Camera worker functionality
 
     # Create a camera worker private to main window using config values
@@ -302,6 +307,8 @@ class MainWindow(QMainWindow):
         if len(input_text) == 0 or not input_text:
             return
         
+        self._target_reported = False
+        
         self.detection_description_requested.emit(input_text)
 
         self._log_widget.addLine(LogLevel.CMD, input_text)
@@ -324,6 +331,25 @@ class MainWindow(QMainWindow):
             self._log_widget.addLine(LogLevel.INFO, "full detection enabled", Colour.BLUE)
         else:
             self._log_widget.addLine(LogLevel.INFO, "full detection disabled", Colour.YELLOW)
+
+    @Slot(object)
+    def _on_target_detected(
+        self,
+        target: Detection | None,
+    ) -> None:
+        """Report a successfully detected target."""
+
+        if target is None or self._target_reported:
+            return
+        
+        self._target_reported = True
+
+        self._log_widget.addLine(LogLevel.INFO,
+            "Detection complete: "
+            f"{target.description or target.class_name} "
+            f"found with {target.confidence:.0%} confidence.",
+            Colour.GREEN
+        )
 
     @Slot(str)
     def request_grounding_dino_detection(self, description: str) -> None:
