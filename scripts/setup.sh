@@ -66,7 +66,10 @@ echo "Syncing python packages for python camera applications..."
 
 sleep 2
 
-repository_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repository_directory="$(
+    cd "$(dirname "${BASH_SOURCE[0]}")/.."
+    pwd
+)"
 
 if ! command -v uv >/dev/null 2>&1; then
     echo "Error: uv is not installed."
@@ -76,5 +79,41 @@ if ! command -v uv >/dev/null 2>&1; then
 fi
 
 echo "Setting up Python environment..."
-cd "$repository_directory/python"
+cd "$repository_directory/python" || exit 1
 uv sync
+
+echo "setting up object-detection models..."
+
+sleep 2
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+
+GROUNDING_DINO_DIR="$PROJECT_ROOT/python/models/grounding_dino"
+GROUNDING_DINO_WEIGHTS="$GROUNDING_DINO_DIR/groundingdino_swint_ogc.pth"
+GROUNDING_DINO_WEIGHTS_URL="https://github.com/IDEA-Research/GroundingDINO/releases/download/v0.1.0-alpha/groundingdino_swint_ogc.pth"
+
+mkdir -p "$GROUNDING_DINO_DIR"
+
+if [[ -s "$GROUNDING_DINO_WEIGHTS" ]]; then
+    echo "Grounding DINO weights already downloaded."
+else
+    echo "Downloading Grounding DINO weights..."
+
+    TEMP_WEIGHTS="$GROUNDING_DINO_WEIGHTS.part"
+
+    if curl \
+        --fail \
+        --location \
+        --retry 3 \
+        --output "$TEMP_WEIGHTS" \
+        "$GROUNDING_DINO_WEIGHTS_URL"
+    then
+        mv "$TEMP_WEIGHTS" "$GROUNDING_DINO_WEIGHTS"
+        echo "Grounding DINO weights downloaded successfully."
+    else
+        rm -f "$TEMP_WEIGHTS"
+        echo "Failed to download Grounding DINO weights." >&2
+        exit 1
+    fi
+fi
