@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from arm.vision.camera import Camera
+from arm.ui.grounding_dino_worker import GroundingDinoWorker
 
 from arm.ui.camera_widget import CameraWidget
 from arm.ui.camera_worker import CameraWorker
@@ -208,7 +209,36 @@ class MainWindow(QMainWindow):
         )
 
         self._camera_worker.moveToThread(self._camera_thread)
+
+        self._camera_thread.finished.connect(self._camera_worker.deleteLater)
+        
+        self._grounding_dino_thread = QThread(self)
+
+        # Do not give this worker a parent because it must be moved
+        # from the GUI thread into the Grounding DINO thread
+        self._grounding_dino_worker = GroundingDinoWorker(
+            config_path = GROUNDING_DINO_CONFIG,
+            weights_path = GROUNDING_DINO_WEIGHTS,
+            yolo_model_name = YOLO_CONFIG,
+        )
+
+        self._grounding_dino_worker.moveToThread(self._grounding_dino_thread)
+
+        self._grounding_dino_thread.finished.connect(self._grounding_dino_worker.deleteLater)
+
+        # Load the model after the worker enters its own thread.
+        self._grounding_dino_thread.started.connect(self._grounding_dino_worker.initialize)
+
+        self._camera_worker.grounding_dino_requested.connect(self._grounding_dino_worker.detect)
+
+        self._grounding_dino_worker.ready.connect(self._camera_worker.set_grounding_dino_ready)
+
+        self._grounding_dino_worker.detection_complete.connect(self._camera_worker.accept_grounding_dino_result)
+
+        self._grounding_dino_worker.error.connect(self._camera_worker.accept_grounding_dino_error)
+
         self._camera_thread.start()
+        self._grounding_dino_thread.start()
 
     # Camera start button functionality
     @Slot()
@@ -294,17 +324,45 @@ class MainWindow(QMainWindow):
             self._log_widget.addLine(LogLevel.INFO, "full detection enabled", Colour.BLUE)
         else:
             self._log_widget.addLine(LogLevel.INFO, "full detection disabled", Colour.YELLOW)
+
+    @Slot(str)
+    def request_grounding_dino_detection(self, description: str) -> None:
+        """Request Grounding DINO detection for a specific object description."""
+        if self._camera_worker is not None:
+            # Set the description in camera worker
+            self._camera_worker.set_detection_description(description)
+            
+            # Trigger detection in background thread
+            self._camera_worker._grounding_dino_worker.run_detection()
+
+    @Slot()
+    def clear_grounding_dino(self) -> None:
+        """Clear Grounding DINO detection state."""
+        if self._camera_worker is not None:
+            self._camera_worker.clear_detections()
         
     # Close any threads that are running when exiting the program
     def closeEvent(self, event: QCloseEvent) -> None:
-        if self._camera_thread.isRunning():
+
+        camera_thread = getattr(self, "_camera_thread", None)
+        grounding_thread = getattr(
+            self,
+            "_grounding_dino_thread",
+            None,
+        )
+
+        if camera_thread is not None and camera_thread.isRunning():
             QMetaObject.invokeMethod(
                 self._camera_worker,
                 "stop",
                 Qt.ConnectionType.BlockingQueuedConnection,
             )
 
-            self._camera_thread.quit()
-            self._camera_thread.wait()
+            camera_thread.quit()
+            camera_thread.wait()
+
+        if grounding_thread is not None and grounding_thread.isRunning():
+            grounding_thread.quit()
+            grounding_thread.wait()
 
         event.accept()

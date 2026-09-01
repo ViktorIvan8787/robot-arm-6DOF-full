@@ -9,6 +9,7 @@ from pathlib import Path
 from cv2 import cvtColor, COLOR_BGR2RGB
 
 from arm.vision.detect import Detection, Detector, highlight_objects
+from arm.ui.grounding_dino_worker import GroundingDinoWorker
 
 class CameraWorker(QObject):
     """
@@ -21,6 +22,7 @@ class CameraWorker(QObject):
     stopped = Signal()
     error = Signal(str)
     target_detected = Signal(object)
+    grounding_dino_requested = Signal(object, str)
 
     def __init__(
         self,
@@ -52,6 +54,11 @@ class CameraWorker(QObject):
 
         self._grounding_dino_config = grounding_dino_config
         self._grounding_dino_weights = grounding_dino_weights
+
+        # Required for threading the grounding dino model
+        self._grounding_dino_ready = False
+        self._grounding_dino_busy = False
+        self._grounded_detections: list[Detection] = []
 
         self._yolo_model_name = yolo_model_name
 
@@ -113,9 +120,17 @@ class CameraWorker(QObject):
         """Set the natural-language description of the target object."""
 
         description = description.strip()
+        new_description = description or None
 
-        self._detection_description = description or None
+        # If the description remains the same, do nothing
+        if new_description == self._detection_description:
+            return
+    
+        self._detection_description = new_description
+        self._grounded_detections = []
         self._target_object = None
+
+        self.target_detected.emit(None)
 
     def clear_detections(self) -> None:
         """Clear all detections included target object for when turning camera off."""
@@ -125,21 +140,74 @@ class CameraWorker(QObject):
 
     @Slot()
     def _read_frame(self) -> None:
-        """Read and emit a single frame."""
+        """
+        Read and emit a single frame while handling multiple threads for the
+        separate grounding dino model and camera.
+        """
         if self._camera is None:
             return
 
         try:
-            # Read frame, convert to RGB and highlight object
             frame = self._camera.read()
+
+            should_request_grounding = (
+                self._detection_description is not None
+                and self._grounding_dino_ready
+                and not self._grounding_dino_busy
+            )
+
+            if should_request_grounding:
+                self._grounding_dino_busy = True
+
+                self.grounding_dino_requested.emit(
+                    frame.copy(),
+                    self._detection_description,
+                )
+
             updated_frame = self._process_frame(frame)
+            self.frame_ready.emit(updated_frame)
 
         except Exception as error:
             self.stop()
             self.error.emit(str(error))
+
+    @Slot()
+    def set_grounding_dino_ready(self) -> None:
+        """Mark Grounding DINO as ready to receive requests."""
+
+        self._grounding_dino_ready = True
+
+    @Slot(str)
+    def accept_grounding_dino_error(
+        self,
+        error_message: str,
+    ) -> None:
+        self._grounding_dino_busy = False
+        self.error.emit(error_message)
+
+    @Slot(object, str)
+    def accept_grounding_dino_result(
+        self,
+        detections: list[Detection],
+        description: str,
+    ) -> None:
+        """Cache the newest Grounding DINO result."""
+
+        self._grounding_dino_busy = False
+
+        # Ignore results from an older description.
+        if description != self._detection_description:
             return
 
-        self.frame_ready.emit(updated_frame)
+        self._grounded_detections = detections
+
+        self._target_object = max(
+            detections,
+            key = lambda detection: detection.confidence,
+            default = None,
+        )
+
+        self.target_detected.emit(self._target_object)
 
     def _close_camera(self) -> None:
         """Close and discard the current camera instance."""
@@ -152,27 +220,21 @@ class CameraWorker(QObject):
 
     def _process_frame(self, frame: Frame) -> Frame:
         """Apply YOLO and/or Grounding DINO detection to a camera frame."""
+        
+        has_description = self._detection_description is not None
 
-        has_description = bool(self._detection_description)
-
-        # Neither detection mode is active.
         if not self._full_detection_enabled and not has_description:
             self._objects_detected = []
-            self._target_object = None
-
-            return cvtColor(frame, COLOR_BGR2RGB)
-
-        # Neither model can run until the detector has been initialized
-        if self._vision_model is None:
             return cvtColor(frame, COLOR_BGR2RGB)
 
         highlighted_frame = frame.copy()
 
         yolo_detections: list[Detection] = []
-        grounded_detections: list[Detection] = []
 
-        # Full detection uses YOLO
-        if self._full_detection_enabled:
+        if (
+            self._full_detection_enabled
+            and self._vision_model is not None
+        ):
             yolo_detections = self._vision_model.analyse(frame)
 
             highlighted_frame = highlight_objects(
@@ -180,32 +242,16 @@ class CameraWorker(QObject):
                 objects=yolo_detections,
             )
 
-        # A commanded description uses Grounding DINO
         if has_description:
-            grounded_detections = self._vision_model.detect(
-                frame=frame,
-                description=self._detection_description,
-            )
-
-            self._target_object = max(
-                grounded_detections,
-                key=lambda detection: detection.confidence,
-                default=None,
-            )
-
-            self.target_detected.emit(self._target_object)
-
-            # Draw Grounding DINO results over the YOLO frame, if YOLO ran
             highlighted_frame = highlight_objects(
                 frame=highlighted_frame,
-                objects=grounded_detections,
+                objects=self._grounded_detections,
                 target_object=self._target_object,
             )
-        else:
-            self._target_object = None
 
         self._objects_detected = (
-            yolo_detections + grounded_detections
+            yolo_detections
+            + self._grounded_detections
         )
 
         return cvtColor(
