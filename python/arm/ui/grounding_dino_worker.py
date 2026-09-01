@@ -7,7 +7,6 @@ from PySide6.QtCore import QObject, Signal, Slot
 from arm.vision.detect import Detector
 from arm.vision.camera_types import Frame
 
-
 class GroundingDinoWorker(QObject):
     ready = Signal()
     detection_complete = Signal(object, str)
@@ -19,7 +18,7 @@ class GroundingDinoWorker(QObject):
         weights_path: str | Path,
         yolo_model_name: str,
     ) -> None:
-        # Do not give this worker a parent.
+        # Do not give this worker a parent
         super().__init__()
 
         self._config_path = config_path
@@ -66,7 +65,7 @@ class GroundingDinoWorker(QObject):
                 description = description,
             )
 
-            # Return the description so stale results can be rejected.
+            # Return the description so stale results can be rejected
             self.detection_complete.emit(
                 detections,
                 description,

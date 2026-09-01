@@ -19,11 +19,12 @@ from PySide6.QtWidgets import (
 
 from arm.vision.camera import Camera
 from arm.vision.detect import Detection
-from arm.ui.grounding_dino_worker import GroundingDinoWorker
 
+from arm.ui.grounding_dino_worker import GroundingDinoWorker
 from arm.ui.camera_widget import CameraWidget
 from arm.ui.camera_worker import CameraWorker
 from arm.ui.log_widget import LogWidget, LogLevel, Colour
+from arm.ui.sanitize_input import SanitizeInput
 
 from arm.config_loader import (
     load_camera_config,
@@ -53,6 +54,7 @@ class MainWindow(QMainWindow):
         self.resize(1920, 1080)
 
         self._target_reported = False
+        self._camera_running = False
 
         self._create_widgets()
         self._create_layout()
@@ -253,6 +255,9 @@ class MainWindow(QMainWindow):
         self._stop_button.setEnabled(True)
         self._detection_button.setEnabled(True)
 
+        self._command_input.clear()
+        self._camera_running = True
+
     # Camera end button functionality
     @Slot()
     def _on_camera_stopped(self) -> None:
@@ -263,6 +268,9 @@ class MainWindow(QMainWindow):
         self._stop_button.setEnabled(False)
         self._detection_button.setChecked(False)
         self._detection_button.setEnabled(False)
+
+        self._command_input.clear()
+        self._camera_running = False
 
     @Slot(str)
     def _on_camera_error(self) -> None:
@@ -277,35 +285,29 @@ class MainWindow(QMainWindow):
     # Command input functionality
 
     def _update_submit_button(self) -> None:
-        if self._command_input.text():
-            self._submit_button.setEnabled(True)
-        else:
-            self._submit_button.setEnabled(False)
+        has_command = bool(self._command_input.text())
 
-    def _extract_object_description(self, command: str) -> str:
-        prefixes = (
-            "pick up ",
-            "find ",
-            "locate ",
-            "detect ",
-        )
+        self._submit_button.setEnabled(self._camera_running and has_command)
 
-        normalised_command = command.strip()
-
-        for prefix in prefixes:
-            if normalised_command.lower().startswith(prefix):
-                return normalised_command[len(prefix):].strip()
-
-        return normalised_command
-
-    @Slot(str)
+    @Slot()
     def _on_submit_button_clicked(self) -> None:
-        input_text = self._command_input.text().strip()
-        input_text = self._extract_object_description(input_text)
-        
-        # Handling empty command input
-        if len(input_text) == 0 or not input_text:
+        input_text = self._command_input.text()
+
+        if not input_text:
             return
+        
+        sanitized_text = SanitizeInput(input_text).process_input()
+        
+        if not sanitized_text.is_valid or sanitized_text.input is None:
+            self._log_widget.addLine(
+                LogLevel.ERROR,
+                "invalid object description",
+                Colour.RED,
+            )
+            self._command_input.clear()
+            return
+        
+        input_text = sanitized_text.input
         
         self._target_reported = False
         
