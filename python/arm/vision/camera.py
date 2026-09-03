@@ -2,7 +2,7 @@ import cv2 as cv
 import warnings
 
 from .camera_types import Frame
-from .detect import Detection, highlightObject
+from .detect import Detection
 
 class Camera:
     """
@@ -72,12 +72,9 @@ class Camera:
     # Use the _capture attribute method to display camera output on another window
     # Press a certain key to quit the application, hence the function returns false
     def display(self,
-        objects: list[Detection],
         frame: Frame
     ) -> bool:
         """Display camera on a separate window, return false if quitting application"""
-        
-        frame = highlightObject(frame, objects)
 
         cv.imshow('window', frame)
         

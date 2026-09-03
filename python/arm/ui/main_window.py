@@ -18,26 +18,44 @@ from PySide6.QtWidgets import (
 )
 
 from arm.vision.camera import Camera
+from arm.vision.detect import Detection, is_valid_detection
 
+from arm.ui.grounding_dino_worker import GroundingDinoWorker
 from arm.ui.camera_widget import CameraWidget
 from arm.ui.camera_worker import CameraWorker
 from arm.ui.log_widget import LogWidget, LogLevel, Colour
+from arm.ui.sanitize_input import SanitizeInput
 
-from arm.config_loader import load_camera_config, load_app_config
+from arm.config_loader import (
+    load_camera_config,
+    load_app_config,
+    load_grounding_dino_config,
+    load_grounding_dino_weights,
+    load_yolo_model
+)
 
 APP_CONFIG = load_app_config()
 CAMERA_CONFIG = load_camera_config()
+YOLO_CONFIG = load_yolo_model()
+GROUNDING_DINO_CONFIG = load_grounding_dino_config()
+GROUNDING_DINO_WEIGHTS = load_grounding_dino_weights()
 
 class MainWindow(QMainWindow):
     start_camera_requested = Signal()
     stop_camera_requested = Signal()
     full_detection_requested = Signal(bool)
 
+    detection_description_requested = Signal(str)
+
     def __init__(self) -> None:
         super().__init__()
 
         self.setWindowTitle("6-DOF Arm Controller")
         self.resize(1920, 1080)
+
+        self._target_reported = False
+        self._camera_running = False
+        self._strict_detection = False
 
         self._create_widgets()
         self._create_layout()
@@ -64,11 +82,18 @@ class MainWindow(QMainWindow):
         self._submit_button = QPushButton("Submit")
         self._submit_button.setObjectName("submitButton")
         self._submit_button.setEnabled(False)
+
         self._detection_button = QPushButton("Full Detection")
         self._detection_button.setObjectName("detectionButton")
         self._detection_button.setCheckable(True)
         self._detection_button.setChecked(False)
         self._detection_button.setEnabled(False)
+
+        self._strict_detection_button = QPushButton("Strict Detection")
+        self._strict_detection_button.setObjectName("detectionButton")
+        self._strict_detection_button.setCheckable(True)
+        self._strict_detection_button.setChecked(False)
+        self._strict_detection_button.setEnabled(False)
 
         self._clear_log_button = QPushButton("Clear Log")
         self._link_arm_button = QPushButton("Link Arm")
@@ -113,9 +138,9 @@ class MainWindow(QMainWindow):
         controls_layout.addWidget(self._start_button, 0, 0)
         controls_layout.addWidget(self._detection_button, 0, 1)
         controls_layout.addWidget(self._link_arm_button, 0, 2)
-
         controls_layout.addWidget(self._stop_button, 1, 0)
-        controls_layout.addWidget(self._clear_log_button, 1, 1)
+        controls_layout.addWidget(self._clear_log_button, 1, 2)
+        controls_layout.addWidget(self._strict_detection_button, 1, 1)
 
         controls_layout.setColumnStretch(0, 1)
         controls_layout.setColumnStretch(1, 1)
@@ -163,6 +188,7 @@ class MainWindow(QMainWindow):
         self._clear_log_button.clicked.connect(self._log_widget.clear_log)
         self._link_arm_button.clicked.connect(self._on_link_arm_button_clicked)
         self._detection_button.toggled.connect(self._on_full_detection_toggled)
+        self._strict_detection_button.toggled.connect(self._on_strict_detection_toggled)
 
         # Camera worker functionality
         self._camera_worker.frame_ready.connect(self._camera_widget.set_frame)
@@ -170,6 +196,9 @@ class MainWindow(QMainWindow):
         self._camera_worker.stopped.connect(self._on_camera_stopped)
         self._camera_worker.error.connect(self._on_camera_error)
         self.full_detection_requested.connect(self._camera_worker.set_full_detection_enabled)
+        self.detection_description_requested.connect(self._camera_worker.set_detection_description)
+
+        self._camera_worker.target_detected.connect(self._on_target_detected)
 
     # Camera worker functionality
 
@@ -177,20 +206,54 @@ class MainWindow(QMainWindow):
     def _create_camera_worker(self) -> None:
         self._camera_thread = QThread(self)
 
+        # Receive a configured camera class
+        # And receive all model configs from main window (so one single import from main_window)
         self._camera_worker = CameraWorker(
-            camera_factory = lambda: Camera(
+            lambda: Camera(
                 CAMERA_CONFIG.device,
                 CAMERA_CONFIG.width,
                 CAMERA_CONFIG.height,
                 CAMERA_CONFIG.fps,
                 # Required depending on the camera you are using
-                CAMERA_CONFIG.format
+                CAMERA_CONFIG.format,
             ),
-            capture_fps = CAMERA_CONFIG.fps,
+            CAMERA_CONFIG.fps,
+            GROUNDING_DINO_CONFIG,
+            GROUNDING_DINO_WEIGHTS,
+            YOLO_CONFIG,
         )
 
         self._camera_worker.moveToThread(self._camera_thread)
+
+        self._camera_thread.finished.connect(self._camera_worker.deleteLater)
+        
+        self._grounding_dino_thread = QThread(self)
+
+        # Do not give this worker a parent because it must be moved
+        # from the GUI thread into the Grounding DINO thread
+        self._grounding_dino_worker = GroundingDinoWorker(
+            config_path = GROUNDING_DINO_CONFIG,
+            weights_path = GROUNDING_DINO_WEIGHTS,
+            yolo_model_name = YOLO_CONFIG,
+        )
+
+        self._grounding_dino_worker.moveToThread(self._grounding_dino_thread)
+
+        self._grounding_dino_thread.finished.connect(self._grounding_dino_worker.deleteLater)
+
+        # Load the model after the worker enters its own thread.
+        self._grounding_dino_thread.started.connect(self._grounding_dino_worker.initialize)
+
+        self._camera_worker.grounding_dino_requested.connect(self._grounding_dino_worker.detect)
+
+        self._grounding_dino_worker.ready.connect(self._camera_worker.set_grounding_dino_ready)
+
+        self._grounding_dino_worker.detection_complete.connect(self._camera_worker.accept_grounding_dino_result)
+
+        self._grounding_dino_worker.error.connect(self._camera_worker.accept_grounding_dino_error)
+
         self._camera_thread.start()
+        self._grounding_dino_thread.start()
 
     # Camera start button functionality
     @Slot()
@@ -199,43 +262,74 @@ class MainWindow(QMainWindow):
         self._start_button.setEnabled(False)
         self._stop_button.setEnabled(True)
         self._detection_button.setEnabled(True)
+        self._strict_detection_button.setEnabled(True)
+
+        self._command_input.clear()
+        self._camera_running = True
 
     # Camera end button functionality
     @Slot()
     def _on_camera_stopped(self) -> None:
         self._log_widget.addLine(LogLevel.INFO, "camera stopped", Colour.YELLOW)
+        self._camera_worker.clear_detections()
         self._camera_widget.clear_frame()
         self._start_button.setEnabled(True)
         self._stop_button.setEnabled(False)
         self._detection_button.setChecked(False)
         self._detection_button.setEnabled(False)
+
+        self._strict_detection_button.setChecked(False)
+        self._strict_detection_button.setEnabled(False)
+
+        self._command_input.clear()
+        self._camera_running = False
 
     @Slot(str)
     def _on_camera_error(self) -> None:
         self._log_widget.addLine(LogLevel.ERROR, "camera connection failure", Colour.RED)
+        self._camera_worker.clear_detections()
         self._camera_widget.clear_frame()
         self._start_button.setEnabled(True)
         self._stop_button.setEnabled(False)
         self._detection_button.setChecked(False)
         self._detection_button.setEnabled(False)
+        self._strict_detection_button.setChecked(False)
+        self._strict_detection_button.setEnabled(False)
 
     # Command input functionality
 
     def _update_submit_button(self) -> None:
-        if self._command_input.text():
-            self._submit_button.setEnabled(True)
-        else:
-            self._submit_button.setEnabled(False)
+        has_command = bool(self._command_input.text().strip())
 
+        self._submit_button.setEnabled(self._camera_running and has_command)
+
+    @Slot()
     def _on_submit_button_clicked(self) -> None:
         input_text = self._command_input.text()
-        
-        # Handling empty command input
-        if len(input_text) == 0:
+
+        if not input_text:
             return
+        
+        sanitized_text = SanitizeInput(input_text).process_input()
+        
+        if not sanitized_text.is_valid or sanitized_text.input is None:
+            self._log_widget.addLine(
+                LogLevel.ERROR,
+                "invalid object description",
+                Colour.RED,
+            )
+            self._command_input.clear()
+            return
+        
+        input_text = sanitized_text.input
+        
+        self._target_reported = False
+        
+        self.detection_description_requested.emit(input_text)
 
         self._log_widget.addLine(LogLevel.CMD, input_text)
         self._log_widget.addLine(LogLevel.DEBUG, "parsing command data...")
+        
         self._command_input.clear()
 
     # Link arm button functionality
@@ -253,17 +347,89 @@ class MainWindow(QMainWindow):
             self._log_widget.addLine(LogLevel.INFO, "full detection enabled", Colour.BLUE)
         else:
             self._log_widget.addLine(LogLevel.INFO, "full detection disabled", Colour.YELLOW)
+
+    # Strict detection mode for filtering out low confidence level objects
+    def _on_strict_detection_toggled(self) -> None:
+
+        self._strict_detection = not self._strict_detection
+
+        self._camera_worker.clear_detections()
+        
+        if self._strict_detection:
+            self._log_widget.addLine(LogLevel.INFO, "strict detection enabled", Colour.BLUE)
+        else:
+            self._log_widget.addLine(LogLevel.INFO, "strict detection disabled", Colour.YELLOW)
+
+    @Slot(object)
+    def _on_target_detected(
+        self,
+        target: Detection | None,
+    ) -> None:
+        """Report a successfully detected target."""
+
+        if target is None or self._target_reported:
+            return
+        
+        self._target_reported = True
+
+        valid_target = is_valid_detection(target)
+
+        if valid_target or not self._strict_detection:
+            self._log_widget.addLine(LogLevel.INFO,
+                "Detection complete: "
+                f"{target.description or target.class_name} "
+                f"found with {target.confidence:.0%} confidence",
+                Colour.GREEN
+            )
+        else:
+            # Use the available target to report error then clear the target data so nothing is drawn
+            self._log_widget.addLine(LogLevel.ERROR,
+                "Detection failure: "
+                f"{target.description or target.class_name} "
+                f"could not be found",
+                Colour.RED
+            )
+
+            self._camera_worker.clear_detections()
+
+    @Slot(str)
+    def request_grounding_dino_detection(self, description: str) -> None:
+        """Request Grounding DINO detection for a specific object description."""
+        if self._camera_worker is not None:
+            # Set the description in camera worker
+            self._camera_worker.set_detection_description(description)
+            
+            # Trigger detection in background thread
+            self._camera_worker._grounding_dino_worker.run_detection()
+
+    @Slot()
+    def clear_grounding_dino(self) -> None:
+        """Clear Grounding DINO detection state."""
+        if self._camera_worker is not None:
+            self._camera_worker.clear_detections()
         
     # Close any threads that are running when exiting the program
     def closeEvent(self, event: QCloseEvent) -> None:
-        if self._camera_thread.isRunning():
+
+        camera_thread = getattr(self, "_camera_thread", None)
+        grounding_thread = getattr(
+            self,
+            "_grounding_dino_thread",
+            None,
+        )
+
+        if camera_thread is not None and camera_thread.isRunning():
             QMetaObject.invokeMethod(
                 self._camera_worker,
                 "stop",
                 Qt.ConnectionType.BlockingQueuedConnection,
             )
 
-            self._camera_thread.quit()
-            self._camera_thread.wait()
+            camera_thread.quit()
+            camera_thread.wait()
+
+        if grounding_thread is not None and grounding_thread.isRunning():
+            grounding_thread.quit()
+            grounding_thread.wait()
 
         event.accept()
