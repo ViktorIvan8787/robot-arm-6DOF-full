@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from arm.vision.camera import Camera
-from arm.vision.detect import Detection
+from arm.vision.detect import Detection, is_valid_detection
 
 from arm.ui.grounding_dino_worker import GroundingDinoWorker
 from arm.ui.camera_widget import CameraWidget
@@ -345,12 +345,25 @@ class MainWindow(QMainWindow):
         
         self._target_reported = True
 
-        self._log_widget.addLine(LogLevel.INFO,
-            "Detection complete: "
-            f"{target.description or target.class_name} "
-            f"found with {target.confidence:.0%} confidence.",
-            Colour.GREEN
-        )
+        valid_target = is_valid_detection(target)
+
+        if valid_target:
+            self._log_widget.addLine(LogLevel.INFO,
+                "Detection complete: "
+                f"{target.description or target.class_name} "
+                f"found with {target.confidence:.0%} confidence",
+                Colour.GREEN
+            )
+        else:
+            # Use the available target to report error then clear the target data so nothing is drawn
+            self._log_widget.addLine(LogLevel.ERROR,
+                "Detection failure: "
+                f"{target.description or target.class_name} "
+                f"could not be found",
+                Colour.RED
+            )
+
+            self._camera_worker.clear_detections()
 
     @Slot(str)
     def request_grounding_dino_detection(self, description: str) -> None:

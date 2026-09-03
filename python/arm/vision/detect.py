@@ -15,6 +15,8 @@ from PIL import Image
 from torch import Tensor
 from torchvision.ops import box_convert
 
+TARGET_CONFIDENCE_THRESHOLD = 0.60
+
 # Custom data type to represent Detection
 @dataclass(frozen=True, slots=True)
 class Detection:
@@ -202,6 +204,18 @@ class Detector:
             )
 
         return detections
+    
+def is_valid_detection(
+    detection: Detection | None,
+) -> bool:
+    """Return whether a detection is suitable as a target."""
+
+    return (
+        detection is not None
+        and detection.confidence >= TARGET_CONFIDENCE_THRESHOLD
+        and detection.width > 0
+        and detection.height > 0
+    )
     
 def highlight_objects(frame: Frame, objects: list[Detection], target_object: Detection | None = None) -> Frame:
     """Highlight the all objects detected on the camera window"""

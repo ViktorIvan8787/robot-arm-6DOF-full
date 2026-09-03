@@ -3,15 +3,17 @@ from __future__ import annotations
 from collections.abc import Callable
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
 from cv2 import cvtColor, COLOR_BGR2RGB
-from arm.vision.camera import Camera
-from arm.vision.camera_types import Frame
 from pathlib import Path
 from cv2 import cvtColor, COLOR_BGR2RGB
 
-from arm.vision.detect import Detection, Detector, highlight_objects
-from arm.ui.grounding_dino_worker import GroundingDinoWorker
-
-TARGET_CONFIDENCE_THRESHOLD = 0.70
+from arm.vision.camera import Camera
+from arm.vision.camera_types import Frame
+from arm.vision.detect import (
+    Detection,
+    Detector,
+    highlight_objects,
+    is_valid_detection
+)
 
 class CameraWorker(QObject):
     """
@@ -139,6 +141,7 @@ class CameraWorker(QObject):
         self._detection_description = None
         self._target_object = None
         self._objects_detected.clear()
+        self.target_detected.emit(None)
 
     @Slot()
     def _read_frame(self) -> None:
@@ -173,19 +176,6 @@ class CameraWorker(QObject):
             self.stop()
             self.error.emit(str(error))
 
-    @staticmethod
-    def _is_valid_detection(
-        detection: Detection | None,
-    ) -> bool:
-        """Return whether a detection is suitable as a target."""
-
-        return (
-            detection is not None
-            and detection.confidence >= TARGET_CONFIDENCE_THRESHOLD
-            and detection.width > 0
-            and detection.height > 0
-        )
-
     @Slot()
     def set_grounding_dino_ready(self) -> None:
         """Mark Grounding DINO as ready to receive requests."""
@@ -211,10 +201,6 @@ class CameraWorker(QObject):
             default = None,
         )
 
-        if not self._is_valid_detection(target):
-            self._target_object = None
-            return
-
         self._grounded_detections = detections
         self._target_object = target
 
@@ -236,13 +222,16 @@ class CameraWorker(QObject):
 
         self._grounded_detections = detections
 
-        self._target_object = max(
+        target = max(
             detections,
             key = lambda detection: detection.confidence,
             default = None,
         )
 
-        self.target_detected.emit(self._target_object)
+        self._grounded_detections = detections
+        self._target_object = target
+
+        self.target_detected.emit(target)
 
     def _close_camera(self) -> None:
         """Close and discard the current camera instance."""
