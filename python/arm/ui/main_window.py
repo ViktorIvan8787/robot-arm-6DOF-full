@@ -55,6 +55,7 @@ class MainWindow(QMainWindow):
 
         self._target_reported = False
         self._camera_running = False
+        self._strict_detection = False
 
         self._create_widgets()
         self._create_layout()
@@ -81,11 +82,18 @@ class MainWindow(QMainWindow):
         self._submit_button = QPushButton("Submit")
         self._submit_button.setObjectName("submitButton")
         self._submit_button.setEnabled(False)
+
         self._detection_button = QPushButton("Full Detection")
         self._detection_button.setObjectName("detectionButton")
         self._detection_button.setCheckable(True)
         self._detection_button.setChecked(False)
         self._detection_button.setEnabled(False)
+
+        self._strict_detection_button = QPushButton("Strict Detection")
+        self._strict_detection_button.setObjectName("detectionButton")
+        self._strict_detection_button.setCheckable(True)
+        self._strict_detection_button.setChecked(False)
+        self._strict_detection_button.setEnabled(False)
 
         self._clear_log_button = QPushButton("Clear Log")
         self._link_arm_button = QPushButton("Link Arm")
@@ -130,9 +138,9 @@ class MainWindow(QMainWindow):
         controls_layout.addWidget(self._start_button, 0, 0)
         controls_layout.addWidget(self._detection_button, 0, 1)
         controls_layout.addWidget(self._link_arm_button, 0, 2)
-
         controls_layout.addWidget(self._stop_button, 1, 0)
-        controls_layout.addWidget(self._clear_log_button, 1, 1)
+        controls_layout.addWidget(self._clear_log_button, 1, 2)
+        controls_layout.addWidget(self._strict_detection_button, 1, 1)
 
         controls_layout.setColumnStretch(0, 1)
         controls_layout.setColumnStretch(1, 1)
@@ -180,6 +188,7 @@ class MainWindow(QMainWindow):
         self._clear_log_button.clicked.connect(self._log_widget.clear_log)
         self._link_arm_button.clicked.connect(self._on_link_arm_button_clicked)
         self._detection_button.toggled.connect(self._on_full_detection_toggled)
+        self._strict_detection_button.toggled.connect(self._on_strict_detection_toggled)
 
         # Camera worker functionality
         self._camera_worker.frame_ready.connect(self._camera_widget.set_frame)
@@ -253,6 +262,7 @@ class MainWindow(QMainWindow):
         self._start_button.setEnabled(False)
         self._stop_button.setEnabled(True)
         self._detection_button.setEnabled(True)
+        self._strict_detection_button.setEnabled(True)
 
         self._command_input.clear()
         self._camera_running = True
@@ -268,6 +278,9 @@ class MainWindow(QMainWindow):
         self._detection_button.setChecked(False)
         self._detection_button.setEnabled(False)
 
+        self._strict_detection_button.setChecked(False)
+        self._strict_detection_button.setEnabled(False)
+
         self._command_input.clear()
         self._camera_running = False
 
@@ -280,6 +293,8 @@ class MainWindow(QMainWindow):
         self._stop_button.setEnabled(False)
         self._detection_button.setChecked(False)
         self._detection_button.setEnabled(False)
+        self._strict_detection_button.setChecked(False)
+        self._strict_detection_button.setEnabled(False)
 
     # Command input functionality
 
@@ -333,6 +348,18 @@ class MainWindow(QMainWindow):
         else:
             self._log_widget.addLine(LogLevel.INFO, "full detection disabled", Colour.YELLOW)
 
+    # Strict detection mode for filtering out low confidence level objects
+    def _on_strict_detection_toggled(self) -> None:
+
+        self._strict_detection = not self._strict_detection
+
+        self._camera_worker.clear_detections()
+        
+        if self._strict_detection:
+            self._log_widget.addLine(LogLevel.INFO, "strict detection enabled", Colour.BLUE)
+        else:
+            self._log_widget.addLine(LogLevel.INFO, "strict detection disabled", Colour.YELLOW)
+
     @Slot(object)
     def _on_target_detected(
         self,
@@ -347,7 +374,7 @@ class MainWindow(QMainWindow):
 
         valid_target = is_valid_detection(target)
 
-        if valid_target:
+        if valid_target or not self._strict_detection:
             self._log_widget.addLine(LogLevel.INFO,
                 "Detection complete: "
                 f"{target.description or target.class_name} "

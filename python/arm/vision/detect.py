@@ -231,10 +231,10 @@ def highlight_objects(frame: Frame, objects: list[Detection], target_object: Det
 
         # Highlight target object with blue
         if target_object == obj:
-            colour = (0, 0, 255)
+            colour = (255, 0, 0)
         else: 
             # Change the colour based on the confidence
-            colour = (round(255 - confidence * 255), round(confidence * 255), 0)
+            colour = (0, round(confidence * 255), round(255 - confidence * 255))
 
         highlighted_frame = cv2.rectangle(highlighted_frame, (obj.x1, obj.y1), (obj.x2, obj.y2), colour, 3)
         highlighted_frame = cv2.putText(highlighted_frame, obj.class_name, (obj.x1 + 5, obj.y1 + 15), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
